@@ -21,7 +21,7 @@ Intercom.prototype.send = function(options, msg) {
 	      ok   = this.channel.assertQueue(options.que);
 
 	return ok.then(function() {
-		log.info('Authoban Intercom - Sending message: ' + msq.toString());
+		log.info('Authoban Intercom - Sending message: ' + msg.toString());
 		that.channel.sendToQueue(options.que, new Buffer(msg));
 	});
 };
