@@ -1,0 +1,27 @@
+{
+  "name": "autobahntools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/larvit/autobahntools.git"
+  },
+  "author": "Lilleman <lilleman@larvit.se>",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/larvit/autobahntools/issues"
+  },
+  "homepage": "https://github.com/larvit/autobahntools#readme",
+  "dependencies": {
+    "amqplib": "^0.4.2",
+    "winston": "^2.2.0"
+  },
+  "devDependencies": {
+    "eslint": "^3.1.1",
+    "mocha": "^2.5.3"
+  }
+}
