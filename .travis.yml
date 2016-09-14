@@ -29,3 +29,5 @@ addons:
     - ubuntu-toolchain-r-test
     packages:
     - g++-4.8
+
+script: mocha test/test.js -confFile=amqp_travis.json
