@@ -1,6 +1,5 @@
-# Autobahntools
+# Larvitamintercom
 
-## Intercom
 Communication wrapper for rabbitmq in autobahn.
 
 
