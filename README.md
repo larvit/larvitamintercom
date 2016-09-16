@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/larvit/larvitamintercom.svg?branch=master)](https://travis-ci.org/larvit/larvitamintercom) [![Dependencies](https://david-dm.org/larvit/larvitamintercom.svg)](https://david-dm.org/larvit/larvitamintercom.svg)
+
 # Larvitamintercom
 
 Communication wrapper for rabbitmq in autobahn.
@@ -6,7 +8,7 @@ Communication wrapper for rabbitmq in autobahn.
 ### Send:
 By default send() will also publish the same message to an exchange with the same name as the send que. Options is declared under this example.
 ```
-const autobahnintercom = require('autobahntools').Intercom,
+const Intercom = require('autobahntools').Intercom,
       connStr          = 'amqp://user:password@192.168.0.1/',
       intercom         = new autobahnintercom(connStr);
 
