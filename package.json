@@ -1,5 +1,5 @@
 {
-  "name": "autobahntools",
+  "name": "larvitamintercom",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,16 +8,17 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/larvit/autobahntools.git"
+    "url": "git+https://github.com/larvit/larvitamintercom.git"
   },
-  "author": "Lilleman <lilleman@larvit.se>",
+  "author": "Gagge <tobias@nublar.se>",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/larvit/autobahntools/issues"
+    "url": "https://github.com/larvit/larvitamintercom/issues"
   },
-  "homepage": "https://github.com/larvit/autobahntools#readme",
+  "homepage": "https://github.com/larvit/larvitamintercom#readme",
   "dependencies": {
     "amqplib": "^0.4.2",
+    "async": "^2.0.1",
     "winston": "^2.2.0"
   },
   "devDependencies": {
