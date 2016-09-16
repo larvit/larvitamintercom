@@ -22,7 +22,7 @@ function Intercom(url) {
 };
 
 // Sending messages directly to que.
-Intercom.prototype.send = function(options, msg) {
+Intercom.prototype.send = function(options, msg, cb) {
 	const	that	= this;
 
 	this.ready(function() {
@@ -30,6 +30,7 @@ Intercom.prototype.send = function(options, msg) {
 		if (options.durable === undefined)	options.durable = false;
 		if (options.publish === undefined)	options.publish = true;
 		if (options.exchange === undefined)	options.exchange = options.que;
+		if (cb === undefined) cb = function() { return; };
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -38,23 +39,20 @@ Intercom.prototype.send = function(options, msg) {
 			}
 
 			channel.assertQueue(options.que);
-			if (options.publish === true) {
-				log.info('Authoban Intercom - Sending message on que \'' + options.que + '\' and publishing on exchange \'' + options.exchange + '\': ' + msg);
-			} else {
-				log.info('Authoban Intercom - Sending message on que \'' + options.que + '\': ' + msg);
-			}
-
+			log.info('Authoban Intercom - Sending message on que \'' + options.que + '\': ' + msg);
 			channel.sendToQueue(options.que, new Buffer(msg));
 
 			if (options.publish === true) {
-				that.publish({exchange: options.exchange}, msg);
+				that.publish({exchange: options.exchange}, msg, cb);
+			} else {
+				cb();
 			}
 		});
 	});
 };
 
 // Consume messages directly from que;
-Intercom.prototype.consume = function(options, cb) {
+Intercom.prototype.consume = function(options, msgCb, cb) {
 	const	that	= this;
 
 	this.ready(function() {
@@ -69,21 +67,26 @@ Intercom.prototype.consume = function(options, cb) {
 			channel.assertQueue(options.que);
 			log.info('Authoban Intercom - Consuming messages on que: \'' + options.que + '\'');
 			channel.consume(options.que, function(msg) {
-				cb(msg);
-			}, {noAck: options.ack});
+				msgCb(msg);
+			}, {noAck: options.ack}, function(err, result) {
+				if (err) {
+					log.error('larvitamintercom - subscribe(): Subscribe error: ' + err.message);
+				}
+				cb(err, result);
+			});
 
 		});
 	});
 };
 
-
 // Publish messages on exchanges.
-Intercom.prototype.publish = function(options, msg) {
+Intercom.prototype.publish = function(options, msg, cb) {
 	const	that	= this;
 
 	this.ready(function() {
 		if (options.exchange === undefined)	options.exchange = '';
 		if (options.type === undefined)	options.type = 'fanout';
+		if (cb === undefined) cb = function() { return; };
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -93,12 +96,13 @@ Intercom.prototype.publish = function(options, msg) {
 			channel.assertExchange(options.exchange, options.type, {durable: false});
 			log.info('Authoban Intercom - Publishing message on exhange \'' +  options.exchange + '\': ' + msg.toString());
 			channel.publish(options.exchange, '', new Buffer(msg));
+			cb();
 		});
 	});
 };
 
 // Subscribe on messagenes of exhange.
-Intercom.prototype.subscribe = function(options, cb) {
+Intercom.prototype.subscribe = function(options, msgCb, cb) {
 	const	that	= this;
 
 	this.ready(function() {
@@ -110,6 +114,7 @@ Intercom.prototype.subscribe = function(options, cb) {
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
 				log.error('larvitamintercom - subscribe(): Channel error: ' + err.message);
+				cb(err);
 				return;
 			}
 
@@ -119,8 +124,13 @@ Intercom.prototype.subscribe = function(options, cb) {
 				log.info('Authoban Intercom - Subscribing on exchange: \'' + options.exchange + '\'');
 				channel.bindQueue(q.queue, options.exchange, '');
 				channel.consume(q.queue, function(msg) {
-					cb(msg);
-				}, {noAck: options.ack});
+					msgCb(msg);
+				}, {noAck: options.ack}, function(err, result) {
+					if (err) {
+						log.error('larvitamintercom - subscribe(): Subscribe error: ' + err.message);
+					}
+					cb(err, result);
+				});
 			});
 		});
 	});

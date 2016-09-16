@@ -1,6 +1,7 @@
 'use strict';
 
 const	assert	= require('assert'),
+	async	= require('async'),
 	log	= require('winston'),
 	fs	= require('fs');
 
@@ -55,49 +56,66 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		intercom.ready(done);
 	});
 
-	it('Send without publish', function(done) {
-		const	message	= 'Hello World',
-			Intercom	= require(__dirname + '/../index.js').Intercom,
-			intercom	= new Intercom(require(confFile).default);
-
-		intercom.send({que: 'testQue1', publish: false}, message);
-		done();
-	});
-
-	it('Consume', function(done) {
+	it('Send & Consume without publishing', function(done) {
 		const	Intercom	= require(__dirname + '/../index.js').Intercom,
 			intercom	= new Intercom(require(confFile).default);
 
 		intercom.consume({que: 'testQue1', ack: true}, function(msg) {
 			assert.deepEqual(msg.content.toString(), 'Hello World');
 			done();
+		}, function(err, result) {
+			if (err) throw err;
+
+			assert(result.consumerTag !== undefined);
+
+			const	message	= 'Hello World',
+				Intercom	= require(__dirname + '/../index.js').Intercom,
+				intercom	= new Intercom(require(confFile).default);
+
+			intercom.send({que: 'testQue1', publish: false}, message);
 		});
 	});
 
 	it('Send & publish', function(done) {
-		const	Intercom	= require(__dirname + '/../index.js').Intercom,
-			intercom	= new Intercom(require(confFile).default);
+		const	tasks = [];
 
-		let	exchangeMessageReceived	= false;
+		tasks.push(function(cb) {
+			const	Intercom	= require(__dirname + '/../index.js').Intercom,
+				intercom	= new Intercom(require(confFile).default);
 
-		intercom.subscribe({exchange: 'testExchange1', ack: true}, function(msg) {
-			assert.deepEqual(msg.content.toString(), 'Hello World');
-			exchangeMessageReceived	= true;
+			intercom.subscribe({exchange: 'testExchange1', ack: true}, function(msg) {
+				assert.deepEqual(msg.content.toString(), 'Hello World');
+				cb();
+			}, function(err, result) {
+				if (err) throw err;
+
+				assert(result.consumerTag !== undefined);
+
+				const	Intercom	= require(__dirname + '/../index.js').Intercom,
+					intercom	= new Intercom(require(confFile).default),
+					message	= 'Hello World';
+
+				intercom.send({que: 'testQue2', exchange: 'testExchange1'}, message);
+			});
 		});
 
-		setTimeout(function() {
+		tasks.push(function(cb) {
 			const	Intercom	= require(__dirname + '/../index.js').Intercom,
-				intercom	= new Intercom(require(confFile).default),
-				message	= 'Hello World';
-
-			intercom.send({que: 'testQue2', exchange: 'testExchange1'}, message);
+				intercom	= new Intercom(require(confFile).default);
 
 			intercom.consume({que: 'testQue2', ack: true}, function(msg) {
 				assert.deepEqual(msg.content.toString(), 'Hello World');
-				assert.deepEqual(exchangeMessageReceived, true);
-				done();
+				cb();
+			}, function(err, result) {
+				if (err) throw err;
+				assert(result.consumerTag !== undefined);
 			});
-		}, 500);
+		});
+
+		async.series(tasks, function(err) {
+			assert( ! err);
+			done();
+		});
 	});
 
 	it('Subscribe & Publish', function(done) {
@@ -107,11 +125,16 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		intercom.subscribe({exchange: 'testExchange2', ack: true}, function(msg) {
 			assert.deepEqual(msg.content.toString(), 'Hello World');
 			done();
-		});
+		}, function(err, result) {
+			if (err) throw err;
 
-		setTimeout(function() {
+			assert(result.consumerTag !== undefined);
+
+			const	Intercom	= require(__dirname + '/../index.js').Intercom,
+				intercom	= new Intercom(require(confFile).default);
+
 			intercom.publish({exchange: 'testExchange2'}, 'Hello World');
-		}, 500);
+		});
 	});
 
 });
