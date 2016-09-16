@@ -1,14 +1,11 @@
 'use strict';
 
 const	assert	= require('assert'),
-	async	= require('async'),
 	log	= require('winston'),
 	fs	= require('fs');
 
-let	intercom,
-	confFile,
+let	confFile,
 	altConfFile;
-
 
 // Set up winston
 log.remove(log.transports.Console);
@@ -40,7 +37,6 @@ before(function(done) {
 		}
 	});
 });
-
 
 describe('Send, Recieve, Publish and Subscribe', function() {
 
@@ -78,7 +74,6 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		});
 	});
 
-
 	it('Send & publish', function(done) {
 		const	Intercom	= require(__dirname + '/../index.js').Intercom,
 			intercom	= new Intercom(require(confFile).default);
@@ -104,7 +99,6 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			});
 		}, 500);
 	});
-
 
 	it('Subscribe & Publish', function(done) {
 		const	Intercom	= require(__dirname + '/../index.js').Intercom,
