@@ -58,6 +58,7 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 	this.ready(function() {
 		if (options.que === undefined)	options.que = '';
 		if (options.ack === undefined)	options.ack = false;
+		if (cb === undefined) cb = function() { return; };
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -110,6 +111,7 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 		if (options.durable === undefined)	options.durable = false;
 		if (options.type === undefined)	options.type = 'fanout';
 		if (options.ack === undefined)	options.ack = false;
+		if (cb === undefined) cb = function() { return; };
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
