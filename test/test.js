@@ -60,6 +60,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		const	Intercom	= require(__dirname + '/../index.js').Intercom,
 			intercom	= new Intercom(require(confFile).default);
 
+		// Consume as opposed to subscribe.
 		intercom.consume({que: 'testQue1', ack: true}, function(msg) {
 			assert.deepEqual(msg.content.toString(), 'Hello World');
 			done();
@@ -68,6 +69,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 
 			assert(result.consumerTag !== undefined);
 
+			// Instantiate a new intercom connection and sends a message.
 			const	message	= 'Hello World',
 				Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
@@ -79,6 +81,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 	it('Send & publish', function(done) {
 		const	tasks = [];
 
+		// Subscribe on testExchange1, send and publish message.
 		tasks.push(function(cb) {
 			const	Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
@@ -99,6 +102,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			});
 		});
 
+		// Consume messages on testQue2.
 		tasks.push(function(cb) {
 			const	Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
@@ -113,7 +117,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		});
 
 		async.series(tasks, function(err) {
-			assert( ! err);
+			if (err) throw err;
 			done();
 		});
 	});
