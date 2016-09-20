@@ -6,7 +6,8 @@ const	log	= require('winston'),
 
 function Intercom(url) {
 	const that = this;
-	this.connected = false;
+
+	this.connected	= false;
 	this.eventEmitter	= new events.EventEmitter();
 
 	amqp.connect(url, function(err, connection) {
@@ -26,11 +27,11 @@ Intercom.prototype.send = function(options, msg, cb) {
 	const	that	= this;
 
 	this.ready(function() {
-		if (options.que === undefined)	options.que = '';
-		if (options.durable === undefined)	options.durable = false;
-		if (options.publish === undefined)	options.publish = true;
-		if (options.exchange === undefined)	options.exchange = options.que;
-		if (cb === undefined) cb = function() { return; };
+		if (options.que	=== undefined)	options.que	= '';
+		if (options.durable	=== undefined)	options.durable	= false;
+		if (options.publish	=== undefined)	options.publish	= true;
+		if (options.exchange	=== undefined)	options.exchange	= options.que;
+		if (cb	=== undefined)	cb	= function() {};
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -56,9 +57,9 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 	const	that	= this;
 
 	this.ready(function() {
-		if (options.que === undefined)	options.que = '';
-		if (options.ack === undefined)	options.ack = false;
-		if (cb === undefined) cb = function() { return; };
+		if (options.que	=== undefined)	options.que	= '';
+		if (options.ack	=== undefined)	options.ack	= true;
+		if (cb	=== undefined)	cb	= function() {};
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -69,7 +70,7 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 			log.info('Authoban Intercom - Consuming messages on que: \'' + options.que + '\'');
 			channel.consume(options.que, function(msg) {
 				msgCb(msg);
-			}, {noAck: options.ack}, function(err, result) {
+			}, {'noAck': options.ack}, function(err, result) {
 				if (err) {
 					log.error('larvitamintercom - subscribe(): Subscribe error: ' + err.message);
 				}
@@ -85,9 +86,9 @@ Intercom.prototype.publish = function(options, msg, cb) {
 	const	that	= this;
 
 	this.ready(function() {
-		if (options.exchange === undefined)	options.exchange = '';
-		if (options.type === undefined)	options.type = 'fanout';
-		if (cb === undefined) cb = function() { return; };
+		if (options.exchange	=== undefined)	options.exchange	= '';
+		if (options.type	=== undefined)	options.type	= 'fanout';
+		if (cb	=== undefined)	cb	= function() {};
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -107,11 +108,11 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 	const	that	= this;
 
 	this.ready(function() {
-		if (options.exchange === undefined)	options.exchange = '';
-		if (options.durable === undefined)	options.durable = false;
-		if (options.type === undefined)	options.type = 'fanout';
-		if (options.ack === undefined)	options.ack = false;
-		if (cb === undefined) cb = function() { return; };
+		if (options.exchange	=== undefined)	options.exchange	= '';
+		if (options.durable	=== undefined)	options.durable	= false;
+		if (options.type	=== undefined)	options.type	= 'fanout';
+		if (options.ack	=== undefined)	options.ack	= true;
+		if (cb	=== undefined)	cb	= function() {};
 
 		that.connection.createChannel(function(err, channel) {
 			if (err) {
@@ -122,12 +123,12 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 
 			channel.assertExchange(options.exchange, options.type, {durable: options.durable});
 
-			channel.assertQueue('', {exclusive: true}, function(err, q) {
+			channel.assertQueue('', {'exclusive': true}, function(err, q) {
 				log.info('Authoban Intercom - Subscribing on exchange: \'' + options.exchange + '\'');
 				channel.bindQueue(q.queue, options.exchange, '');
 				channel.consume(q.queue, function(msg) {
 					msgCb(msg);
-				}, {noAck: options.ack}, function(err, result) {
+				}, {'noAck': options.ack}, function(err, result) {
 					if (err) {
 						log.error('larvitamintercom - subscribe(): Subscribe error: ' + err.message);
 					}

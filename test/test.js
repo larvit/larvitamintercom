@@ -2,6 +2,7 @@
 
 const	assert	= require('assert'),
 	async	= require('async'),
+	uuidLib	= require('uuid'), // Used to make unique exchange and queue names
 	log	= require('winston'),
 	fs	= require('fs');
 
@@ -13,10 +14,11 @@ log.remove(log.transports.Console);
 
 before(function(done) {
 	// Set configure file
-	if (process.argv[3] === undefined)
+	if (process.argv[3] === undefined) {
 		confFile = __dirname + '/../config/amqp_test.json';
-	else
+	} else {
 		confFile = process.argv[3].split('=')[1];
+	}
 
 	log.verbose('Autobahn config file: "' + confFile + '"');
 
@@ -27,9 +29,9 @@ before(function(done) {
 			log.info('Failed to find config file "' + confFile + '", retrying with "' + altConfFile + '"');
 
 			fs.stat(altConfFile, function(err) {
+				if (err) throw err;
 
-				if (err) assert( ! err, 'fs.stat failed: ' + err.message);
-				else if ( ! err) confFile	= altConfFile;
+				confFile	= altConfFile;
 
 				done();
 			});
@@ -41,6 +43,7 @@ before(function(done) {
 
 describe('Send, Recieve, Publish and Subscribe', function() {
 
+	/**/
 	it('Test Connection', function(done) {
 		const	Intercom	= require(__dirname + '/../index.js').Intercom,
 			intercom	= new Intercom(require(confFile).default);
@@ -54,39 +57,82 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			intercom	= new Intercom(require(confFile).default);
 
 		intercom.ready(done);
-	});
+	});/**/
 
 	it('Send & Consume without publishing', function(done) {
-		const	Intercom	= require(__dirname + '/../index.js').Intercom,
-			intercom	= new Intercom(require(confFile).default);
+		const	queueName	= uuidLib.v4(),
+			tasks	= [];
 
-		// Consume as opposed to subscribe.
-		intercom.consume({que: 'testQue1', ack: true}, function(msg) {
+		// Handle incoming consumed message
+		function handleCon(msg) {
 			assert.deepEqual(msg.content.toString(), 'Hello World');
-			done();
-		}, function(err, result) {
-			if (err) throw err;
 
-			assert(result.consumerTag !== undefined);
+			// We wait 200ms to make sure no subscribed message is received in handleSub() before exiting
+			setTimeout(function() {
+				done();
+			}, 200);
+		}
 
+		// Handle incoming subscribed message
+		function handleSub(msg) {
+			throw new Error('No message should be received on this channel, but received: ' + msg.content.toString());
+		}
+
+		// Subscribe to queue (this shoul fail!)
+		tasks.push(function(cb) {
+			const	Intercom	= require(__dirname + '/../index.js').Intercom,
+				intercom	= new Intercom(require(confFile).default);
+
+			// We subscribe on the exchange == queueName since this is the default if no exchange is given in the send
+			intercom.subscribe({'exchange': queueName}, handleSub, function(err, result) {
+				if (err) throw err;
+
+				assert.notDeepEqual(result.consumerTag, undefined);
+				cb();
+			});
+		});
+
+		// Consume from queue
+		tasks.push(function(cb) {
+			const	Intercom	= require(__dirname + '/../index.js').Intercom,
+				intercom	= new Intercom(require(confFile).default);
+
+			// Consume as opposed to subscribe.
+			intercom.consume({'que': queueName}, handleCon, function(err, result) {
+				if (err) throw err;
+
+				assert.notDeepEqual(result.consumerTag, undefined);
+				cb();
+			});
+		});
+
+		// Send to queue
+		tasks.push(function(cb) {
 			// Instantiate a new intercom connection and sends a message.
 			const	message	= 'Hello World',
 				Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
 
-			intercom.send({que: 'testQue1', publish: false}, message);
+			intercom.send({que: queueName, publish: false}, message, cb);
+		});
+
+		async.series(tasks, function(err) {
+			if (err) throw err;
 		});
 	});
 
+	/**/
 	it('Send & publish', function(done) {
-		const	tasks = [];
+		const	exchangeName	= uuidLib.v4(),
+			queueName	= uuidLib.v4(),
+			tasks	= [];
 
-		// Subscribe on testExchange1, send and publish message.
+		// Subscribe on testExchange2, send and publish message.
 		tasks.push(function(cb) {
 			const	Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
 
-			intercom.subscribe({exchange: 'testExchange1', ack: true}, function(msg) {
+			intercom.subscribe({'exchange': exchangeName}, function(msg) {
 				assert.deepEqual(msg.content.toString(), 'Hello World');
 				cb();
 			}, function(err, result) {
@@ -98,7 +144,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 					intercom	= new Intercom(require(confFile).default),
 					message	= 'Hello World';
 
-				intercom.send({que: 'testQue2', exchange: 'testExchange1'}, message);
+				intercom.send({'que': queueName, 'exchange': exchangeName}, message);
 			});
 		});
 
@@ -107,7 +153,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			const	Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
 
-			intercom.consume({que: 'testQue2', ack: true}, function(msg) {
+			intercom.consume({'que': queueName}, function(msg) {
 				assert.deepEqual(msg.content.toString(), 'Hello World');
 				cb();
 			}, function(err, result) {
@@ -120,13 +166,15 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			if (err) throw err;
 			done();
 		});
-	});
+	});/**/
 
+	/**/
 	it('Subscribe & Publish', function(done) {
-		const	Intercom	= require(__dirname + '/../index.js').Intercom,
+		const	exchangeName	= uuidLib.v4(),
+			Intercom	= require(__dirname + '/../index.js').Intercom,
 			intercom	= new Intercom(require(confFile).default);
 
-		intercom.subscribe({exchange: 'testExchange2', ack: true}, function(msg) {
+		intercom.subscribe({'exchange': exchangeName}, function(msg) {
 			assert.deepEqual(msg.content.toString(), 'Hello World');
 			done();
 		}, function(err, result) {
@@ -137,8 +185,8 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			const	Intercom	= require(__dirname + '/../index.js').Intercom,
 				intercom	= new Intercom(require(confFile).default);
 
-			intercom.publish({exchange: 'testExchange2'}, 'Hello World');
+			intercom.publish({'exchange': exchangeName}, 'Hello World');
 		});
-	});
+	});/**/
 
 });
