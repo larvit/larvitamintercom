@@ -19,14 +19,14 @@ let	confFile,
 	intercom32;
 
 // Set up winston
-log.remove(log.transports.Console);
+//log.remove(log.transports.Console);
 
 before(function(done) {
 	// Set configure file
 	if (process.argv[3] === undefined) {
 		confFile = __dirname + '/../config/amqp_test.json';
 	} else {
-		confFile = process.argv[3].split('=')[1];
+		confFile = __dirname + '/../config/' + process.argv[3].split('=')[1];
 	}
 
 	log.verbose('Autobahn config file: "' + confFile + '"');
@@ -39,7 +39,6 @@ before(function(done) {
 
 			fs.stat(altConfFile, function(err) {
 				if (err) throw err;
-
 				instantiateIntercoms(altConfFile);
 			});
 		} else {
