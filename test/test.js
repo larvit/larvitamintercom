@@ -40,21 +40,25 @@ before(function(done) {
 			fs.stat(altConfFile, function(err) {
 				if (err) throw err;
 
-				confFile	= altConfFile;
+				instantiateIntercoms(altConfFile);
 			});
+		} else {
+			instantiateIntercoms(confFile);
 		}
 	});
 
-	intercom11	= new Intercom(require(confFile).default);
-	intercom12	= new Intercom(require(confFile).default);
-	intercom13	= new Intercom(require(confFile).default);
-	intercom21	= new Intercom(require(confFile).default);
-	intercom22	= new Intercom(require(confFile).default);
-	intercom23	= new Intercom(require(confFile).default);
-	intercom31	= new Intercom(require(confFile).default);
-	intercom32	= new Intercom(require(confFile).default);
+	function instantiateIntercoms(config) {
+		intercom11	= new Intercom(require(config).default);
+		intercom12	= new Intercom(require(config).default);
+		intercom13	= new Intercom(require(config).default);
+		intercom21	= new Intercom(require(config).default);
+		intercom22	= new Intercom(require(config).default);
+		intercom23	= new Intercom(require(config).default);
+		intercom31	= new Intercom(require(config).default);
+		intercom32	= new Intercom(require(config).default);
+		done();
+	}
 
-	done();
 });
 
 describe('Send, Recieve, Publish and Subscribe', function() {
