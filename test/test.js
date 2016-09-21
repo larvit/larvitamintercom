@@ -19,7 +19,7 @@ let	confFile,
 	intercom32;
 
 // Set up winston
-//log.remove(log.transports.Console);
+log.remove(log.transports.Console);
 
 before(function(done) {
 	// Set configure file
