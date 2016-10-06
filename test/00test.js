@@ -1,14 +1,13 @@
 'use strict';
 
-const	assert	= require('assert'),
-	async	= require('async'),
+const	Intercom	= require(__dirname + '/../index.js').Intercom,
 	uuidLib	= require('uuid'), // Used to make unique exchange and queue names
+	assert	= require('assert'),
+	async	= require('async'),
 	log	= require('winston'),
-	fs	= require('fs'),
-	Intercom	= require(__dirname + '/../index.js').Intercom;
+	fs	= require('fs');
 
 let	confFile,
-	altConfFile,
 	intercom11,
 	intercom12,
 	intercom13,
@@ -22,42 +21,44 @@ let	confFile,
 log.remove(log.transports.Console);
 
 before(function(done) {
-	// Set configure file
-	if (process.argv[3] === undefined) {
+	function instantiateIntercoms(config) {
+		intercom11	= new Intercom(config);
+		intercom12	= new Intercom(config);
+		intercom13	= new Intercom(config);
+		intercom21	= new Intercom(config);
+		intercom22	= new Intercom(config);
+		intercom23	= new Intercom(config);
+		intercom31	= new Intercom(config);
+		intercom32	= new Intercom(config);
+		done();
+	}
+
+	if (process.env.CONFFILE === undefined) {
 		confFile = __dirname + '/../config/amqp_test.json';
 	} else {
-		confFile = __dirname + '/../config/' + process.argv[3].split('=')[1];
+		confFile = process.env.CONFFILE;
 	}
 
 	log.verbose('Autobahn config file: "' + confFile + '"');
 
+	// First look for absolute path
 	fs.stat(confFile, function(err) {
-		altConfFile = __dirname + '/../config/' + confFile;
-
 		if (err) {
-			log.info('Failed to find config file "' + confFile + '", retrying with "' + altConfFile + '"');
 
-			fs.stat(altConfFile, function(err) {
+			// Then look for this string in the config folder
+			confFile = __dirname + '/../config/' + confFile;
+			fs.stat(confFile, function(err) {
 				if (err) throw err;
-				instantiateIntercoms(altConfFile);
+				log.verbose('Autobahn config: ' + JSON.stringify(require(confFile)));
+				instantiateIntercoms(require(confFile).default);
 			});
-		} else {
-			instantiateIntercoms(confFile);
+
+			return;
 		}
+
+		log.verbose('Autobahn config: ' + JSON.stringify(require(confFile)));
+		instantiateIntercoms(require(confFile).default);
 	});
-
-	function instantiateIntercoms(config) {
-		intercom11	= new Intercom(require(config).default);
-		intercom12	= new Intercom(require(config).default);
-		intercom13	= new Intercom(require(config).default);
-		intercom21	= new Intercom(require(config).default);
-		intercom22	= new Intercom(require(config).default);
-		intercom23	= new Intercom(require(config).default);
-		intercom31	= new Intercom(require(config).default);
-		intercom32	= new Intercom(require(config).default);
-		done();
-	}
-
 });
 
 describe('Send, Recieve, Publish and Subscribe', function() {
@@ -75,7 +76,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			intercom	= new Intercom(require(confFile).default);
 
 		intercom.ready(done);
-	});/**/
+	});
 
 	it('Send & Consume without publishing', function(done) {
 		const	queueName	= uuidLib.v4(),
