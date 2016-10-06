@@ -16,8 +16,8 @@ function Intercom(url) {
 			return;
 		}
 
-		that.connection = connection;
-		that.connected = true;
+		that.connection	= connection;
+		that.connected	= true;
 		that.eventEmitter.emit('connected');
 	});
 };
