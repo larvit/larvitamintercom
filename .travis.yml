@@ -30,4 +30,4 @@ addons:
     packages:
     - g++-4.8
 
-script: env CONFFILE=db_travis.json mocha
+script: env CONFFILE=amqp_travis.json mocha
