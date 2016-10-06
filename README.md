@@ -52,7 +52,7 @@ intercom.consume(options, function(msg) {
 ```
 {
   que: '',
-  ack: false
+  ack: true
 }
 ```
 
@@ -78,7 +78,7 @@ intercom.subscribe(options, function(msg) {
   exchange: '',
   durable: false,
   type: 'fanout',
-  ack: false
+  ack: true
 }
 ```
 
@@ -102,6 +102,6 @@ intercom.publish(options, message, function() {
 ```
 {
   exchange: '',
-	type: 'fanout'
+  type: 'fanout'
 }
 ```
