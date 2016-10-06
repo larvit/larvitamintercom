@@ -13,12 +13,11 @@ const	Intercom	= require('larvitamintercom').Intercom,
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-let	message	= 'Hello World', // This will be converted to a Buffer. Naturally this could also be a buffer to begin with.
+let	message	= {'hello': 'world'},
 	options	= {'que': 'senderQue'};
 
-intercom.send(options, message, function(err) {
-	// When callback is invoked the message have been received by rabbit
-	// THIS IS NOT IMPLEMENTED!!!
+intercom.send(message, options, function(err) {
+	// When callback is invoked the message have been acked by a receiver
 });
 ```
 
@@ -42,9 +41,10 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'que': 'sendQue'};
 
-intercom.consume(options, function(msg) {
-	// msg being an object with lots of stuff
-	// msg.content will be a buffer containing "message" from intercom.send()
+intercom.consume(options, function(message, rawMsg) {
+	// message being the object sent with intercom.send()
+	// rawMsg being an object with lots of stuff directly from RabbitMQ
+	// message === JSON.parse(rawMsg.content.toString())
 }, function(err, result) {
 	// Callback from established consume connection
 	// TODO: find out what result is
@@ -70,9 +70,10 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'exchange': 'subscribeExchange'};
 
-intercom.subscribe(options, function(msg) {
-	// msg being an object with lots of stuff
-	// msg.content will be a buffer containing "message" from intercom.send()
+intercom.subscribe(options, function(message, rawMsg) {
+	// message being the object sent with intercom.send()
+	// rawMsg being an object with lots of stuff directly from RabbitMQ
+	// message === JSON.parse(rawMsg.content.toString())
 }, function(err, result) {
 	// Callback from established subscribe connection
 	// TODO: find out what result is
@@ -92,19 +93,18 @@ intercom.subscribe(options, function(msg) {
 
 ### Publish:
 
-The send() function will automatically publish the message that message that going to med sent to a regular que. How ever, if you want to publish a message without sending it to at regular que you can do that as well.
+The send() function will automatically publish the message as well. However, if you want to publish a message without sending it to at regular que you can do that as well.
 
 ```javascript
 const	Intercom	= require('larvitamintercom').Intercom,
 	conStr	 'amqp://user:password@192.168.0.1/',
 	intercom	 new Intercom(conStr);
 
-let	message	= 'Hello World', // This will be converted to a Buffer. Naturally this could also be a buffer to begin with.
+let	message	= {'hello': 'world'}, // This will be converted to a Buffer. Naturally this could also be a buffer to begin with.
 	options	= {'exchange': 'publishExchange'};
 
-intercom.publish(options, message, function(err) {
-	// When callback is invoked the message have been received by rabbit
-	// THIS IS NOT IMPLEMENTED!!!
+intercom.publish(message, options, function(err) {
+	// When callback is invoked the message have been received by all subscribers
 });
 ```
 
