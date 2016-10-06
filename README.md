@@ -15,7 +15,7 @@ const Intercom = require('larvitamintercom').Intercom,
 let message = {"msg":"Hello World"};
     options = {que: 'senderQue'};
 
-intercom.send(options, message function() {
+intercom.send(options, message, function() {
   // Do something when message is published.
   // (This is optional)
 });
