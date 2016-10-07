@@ -42,8 +42,18 @@ function Intercom(conStr) {
 
 	// Open AMQP communication
 	tasks.push(function(cb) {
-		const	heartBeat	= true;
-		that.handle.openAMQPCommunication(parsedConStr.auth.split(':')[0], parsedConStr.auth.split(':')[1], heartBeat, function(err) {
+		const	heartBeat	= true,
+			auth	= parsedConStr.auth;
+
+		let	username,
+			password;
+
+		if (auth) {
+			username	= parsedConStr.auth.split(':')[0];
+			password	= parsedConStr.auth.split(':')[1];
+		}
+
+		that.handle.openAMQPCommunication(username, password, heartBeat, function(err) {
 			if (err) {
 				log.error('larvitamintercom: Intercom() - Error opening AMQP communication: ' + err.message);
 				that.emit('error', err);
