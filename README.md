@@ -4,47 +4,66 @@
 
 Communication wrapper for rabbitmq in autobahn.
 
-### Send:
+## Usage
 
-By default send() will also publish the same message to an exchange with the same name as the send que. Options is declared under this example.
+### Send
+
+send() to autobahn.
 
 ```javascript
-const	Intercom	= require('larvitamintercom').Intercom,
+const	Intercom	= require('larvitamintercom'),
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-let	message	= {'hello': 'world'},
-	options	= {'que': 'senderQue'};
+let	message	= {'hello':	'world'},
+	options	= {'exchange':	'default'}; // Will default to "default" if options is omitted
 
 intercom.send(message, options, function(err) {
-	// When callback is invoked the message have been acked by a receiver
+	// called when message is accepted by queue handler
+}, function(err) {
+	// called when all consumeres have acked the message
 });
 ```
 
-###### Default send options:
+#### Default send options:
 
 ```javascript
 {
-	'que':	'',
-	'exchange':	this.que,
-	'durable':	false,
-	'publish':	true
+	'exchange':	'default',
+	'durable':	true
 }
 ```
 
-### Consume:
+### Read
+
+There are two types of read operations; "consume" and "subscribe".
+
+A message can only be "consumed" once, but it can be "subscribed" several times, by different readers.
+
+Consumers can be assigned to an exchanged after the message have been sent, and they still receive the message.
+
+Subscribers, in contrast, must subscribe BEFORE the message is sent or they will not receive it.
+
+Each subscriber only get each message once.
+
+#### Consume
 
 ```javascript
-const	Intercom	= require('larvitamintercom').Intercom,
+const	Intercom	= require('larvitamintercom'),
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-let options = {'que': 'sendQue'};
+let options = {'exchange': 'default'}; // Will default to "default" if options is omitted
 
-intercom.consume(options, function(message, rawMsg) {
+intercom.consume(options, function(message, ack, rawMsg) {
 	// message being the object sent with intercom.send()
 	// rawMsg being an object with lots of stuff directly from RabbitMQ
 	// message === JSON.parse(rawMsg.content.toString())
+
+	// Must be ran! Always! ACK!!
+	ack();
+	// or
+	ack(new Error('Something was wrong with the message'));
 }, function(err, result) {
 	// Callback from established consume connection
 	// TODO: find out what result is
@@ -52,67 +71,42 @@ intercom.consume(options, function(message, rawMsg) {
 
 ```
 
-###### Default consume options:
+##### Default consume options:
 
 ```javascript
 {
-	'que': '',
-	'ack': true
+	'exchange':	'default'
 }
 ```
 
-### Subscribe:
+#### Subscribe
 
 ```javascript
 const	Intercom	= require('larvitamintercom').Intercom,
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-let options = {'exchange': 'subscribeExchange'};
+let options = {'exchange': 'default'};
 
-intercom.subscribe(options, function(message, rawMsg) {
-	// message being the object sent with intercom.send()
+intercom.consume(options, function(message, ack, rawMsg) {
+	// message subscribe the object sent with intercom.send()
 	// rawMsg being an object with lots of stuff directly from RabbitMQ
 	// message === JSON.parse(rawMsg.content.toString())
+
+	// Must be ran! Always! ACK!!
+	ack();
+	// or
+	ack(new Error('Something was wrong with the message'));
 }, function(err, result) {
 	// Callback from established subscribe connection
 	// TODO: find out what result is
 });
 ```
 
-###### Default subscribe options:
+##### Default subscribe options:
 
 ```javascript
 {
-	'exchange':	'',
-	'durable':	false,
-	'type':	'fanout',
-	'ack':	true
-}
-```
-
-### Publish:
-
-The send() function will automatically publish the message as well. However, if you want to publish a message without sending it to at regular que you can do that as well.
-
-```javascript
-const	Intercom	= require('larvitamintercom').Intercom,
-	conStr	 'amqp://user:password@192.168.0.1/',
-	intercom	 new Intercom(conStr);
-
-let	message	= {'hello': 'world'}, // This will be converted to a Buffer. Naturally this could also be a buffer to begin with.
-	options	= {'exchange': 'publishExchange'};
-
-intercom.publish(message, options, function(err) {
-	// When callback is invoked the message have been received by all subscribers
-});
-```
-
-###### Default publish options:
-
-```javascript
-{
-	'exchange':	'',
-	'type':	'fanout'
+	'exchange':	'default'
 }
 ```
