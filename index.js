@@ -23,19 +23,25 @@ function Intercom(conStr) {
 		that	= this;
 
 	that.channelName	= 1;
+	that.host	= parsedConStr.hostname;
+	that.port	= parsedConStr.port || 5672;
 
 	that.socket = net.connect({
-		'port': parsedConStr.port || 5672,
-		'host':	parsedConStr.hostname
+		'port': that.port,
+		'host':	that.host
 	});
+
+	log.verbose('larvitamintercom: Intercom() - Initializing on ' + that.host + ':' + that.port);
 
 	// Create handle by socket connect to rabbitmq
 	tasks.push(function(cb) {
 		bramqp.initialize(that.socket, 'rabbitmq/full/amqp0-9-1.stripped.extended', function(err, result) {
 			if (err) {
-				log.error('larvitamintercom: Intercom() - Error connecting to RabbitMQ: ' + err.message);
+				log.error('larvitamintercom: Intercom() - Error connecting to ' + that.host + ':' + that.port + ' err: ' + err.message);
 				that.emit('error', err);
 			}
+
+			log.debug('larvitamintercom: Intercom() - bramqp.initialize() ran on ' + that.host + ':' + that.port);
 
 			that.handle = result;
 			cb(err);
@@ -55,6 +61,8 @@ function Intercom(conStr) {
 			password	= parsedConStr.auth.split(':')[1];
 		}
 
+		log.debug('larvitamintercom: Intercom() - openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
+
 		that.handle.openAMQPCommunication(username, password, heartBeat, function(err) {
 			if (err) {
 				log.error('larvitamintercom: Intercom() - Error opening AMQP communication: ' + err.message);
@@ -67,6 +75,7 @@ function Intercom(conStr) {
 
 	async.series(tasks, function(err) {
 		if ( ! err) {
+			log.debug('larvitamintercom: Intercom() - Initialized on ' + that.host + ':' + that.port);
 			that.emit('ready');
 		}
 	});
@@ -83,10 +92,14 @@ Intercom.prototype.bindQueue = function(queueName, exchangeName, cb) {
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
 		that	= this;
 
+	log.verbose('larvitamintercom: bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchangeName + '"');
+
 	that.handle.queue.bind(that.channelName, queueName, exchangeName, 'ignored-routing-key', noWait, args, function(err) {
 		if (err) {
 			log.error('larvitamintercom: bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchangeName + '", err: ' + err.message);
 		}
+
+		log.debug('larvitamintercom: bindQueue() - Bound queue "' + queueName + '" to exchange "' + exchangeName + '"');
 
 		cb(err);
 	});
@@ -96,6 +109,8 @@ Intercom.prototype.bindQueue = function(queueName, exchangeName, cb) {
 Intercom.prototype.close = function(cb) {
 	const	that = this;
 
+	log.verbose('larvitamintercom: close() - on ' + that.host + ':' + that.port);
+
 	that.handle.closeAMQPCommunication(function(err) {
 		if (err) {
 			log.warn('larvitamintercom: close() - Could not closeAMQPCommunication: ' + err.message);
@@ -104,7 +119,10 @@ Intercom.prototype.close = function(cb) {
 		}
 
 		that.handle.socket.end();
-		setImmediate(cb);
+		setImmediate(function() {
+			log.debug('larvitamintercom: close() - closed ' + that.host + ':' + that.port);
+			cb();
+		});
 	});
 };
 
@@ -127,6 +145,8 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
 
 	queueName	= 'queTo_' + options.exchange;
+
+	log.verbose('larvitamintercom: consume() - Starting on exchange "' + options.exchange + '"');
 
 	// Declare exchange
 	tasks.push(function(cb) {
@@ -161,42 +181,36 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 
 		that.handle.basic.consume(that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args);
 		that.handle.once(that.channelName + ':basic.consume-ok', function(channel, method, data) {
-			console.log('Consuming from queue');
-
-			console.log('channel:');
-			console.log(channel);
-
-			console.log('method:');
-			console.log(method);
-
-			console.log('data:');
-			console.log(data);
-
+			log.verbose('larvitamintercom: consume() - Started consuming with consumer tag: "' + data['consumer-tag'] + '"');
 			cb();
 		});
 	});
 
-	// Register msbCb
+	// Register msgCb
 	tasks.push(function(cb) {
 		that.handle.on(that.channelName + ':basic.deliver', function(channel, method, data) {
-			console.log('incomming message, data:');
-			console.log(data);
+			const	deliveryTag	= data['delivery-tag'];
+
+			log.debug('larvitamintercom: consume() - Incoming message, deliveryTag: "' + deliveryTag + '"');
 
 			that.handle.once('content', function(channel, className, properties, content) {
-				console.log('got a message:');
-				console.log(content.toString());
-				console.log('with properties:');
-				console.log(properties);
-				console.log('channel:');
-				console.log(channel);
-				console.log('className:');
-				console.log(className);
+				let	message;
 
-				msgCb(content, function(err) {
+				try {
+					message = JSON.parse(content.toString());
+				} catch(err) {
+					log.warn('larvitamintercom: consume() - Could not parse incoming message. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
+					cb(err);
+					return;
+				}
+
+				msgCb(message, function(err) {
 					if (err) {
-						that.handle.basic.nack(that.channelName, data['delivery-tag']);
+						log.warn('larvitamintercom: consume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
+						that.handle.basic.nack(that.channelName, deliveryTag);
 					} else {
-						that.handle.basic.ack(that.channelName, data['delivery-tag']);
+						log.debug('larvitamintercom: consume() - ack on deliveryTag: "' + deliveryTag + '"');
+						that.handle.basic.ack(that.channelName, deliveryTag);
 					}
 				});
 			});
@@ -214,11 +228,13 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 		internal	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.internal
 		passive	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.passive
 		durable	= true,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.durable
-		noWait	= false,	// "If set, the server will not respond to the method. The client should not wait for a reply method. If the server could not complete the method it will raise a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+		noWait	= false,	// "If set, the server will not respond to the method. The client should not wait
+				// for a reply method. If the server could not complete the method it will raise
+				// a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.arguments
 		that	= this;
 
-
+	log.verbose('larvitamintercom: declareExchange() - exchangeName: "' + exchangeName + '"');
 
 	that.handle.exchange.declare(
 		that.channelName,
@@ -234,6 +250,8 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 			if (err) {
 				log.warn('larvitamintercom: declareExchange() - Could not declare exchange "' + exchangeName + '", err: ' + err.message);
 			}
+
+			log.debug('larvitamintercom: declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
 
 			cb(err);
 		}
@@ -271,10 +289,14 @@ Intercom.prototype.declareQueue = function(options, cb) {
 	if (options.queueName	=== undefined)	{ options.queueName	= null;	}
 	if (options.exclusive	=== undefined)	{ options.exclusive	= false;	}
 
+	log.verbose('larvitamintercom: declareQueue() - Declaring. queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
+
 	that.handle.queue.declare(that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args, function(err) {
 		if (err) {
 			log.error('larvitamintercom: declareQueue() - Could not declare queue, name: "' + options.queueName + '" err: ' + err.message);
 		}
+
+		log.debug('larvitamintercom: declareQueue() - Declared! queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
 
 		cb(err);
 	});
@@ -316,7 +338,7 @@ Intercom.prototype.send = function(message, options, cb) {
 		return;
 	}
 
-	log.verbose('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+	log.debug('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
 
 	// Declare exchange
 	tasks.push(function(cb) {
