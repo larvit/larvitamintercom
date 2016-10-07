@@ -1,36 +1,40 @@
 'use strict';
 
-const	Intercom	= require(__dirname + '/../index.js').Intercom,
-	uuidLib	= require('uuid'), // Used to make unique exchange and queue names
+const	intercoms	= [],
+	Intercom	= require(__dirname + '/../index.js'),
+	//uuidLib	= require('uuid'), // Used to make unique exchange and queue names
 	assert	= require('assert'),
 	async	= require('async'),
 	log	= require('winston'),
 	fs	= require('fs');
 
-let	confFile,
-	intercom11,
-	intercom12,
-	intercom13,
-	intercom21,
-	intercom22,
-	intercom23,
-	intercom31,
-	intercom32;
+let	confFile;
 
 // Set up winston
 log.remove(log.transports.Console);
+/**/log.add(log.transports.Console, {
+	'colorize':	true,
+	'timestamp':	true,
+	'level':	'debug',
+	'json':	false
+});
+/**/
 
 before(function(done) {
 	function instantiateIntercoms(config) {
-		intercom11	= new Intercom(config);
-		intercom12	= new Intercom(config);
-		intercom13	= new Intercom(config);
-		intercom21	= new Intercom(config);
-		intercom22	= new Intercom(config);
-		intercom23	= new Intercom(config);
-		intercom31	= new Intercom(config);
-		intercom32	= new Intercom(config);
-		done();
+		const	tasks	= [];
+
+		for (let i = 0; i < 10; i ++) {
+			tasks.push(function(cb) {
+				const	intercom	= new Intercom(config);
+
+				intercoms.push(intercom);
+				intercom.on('ready', cb);
+			});
+		}
+
+		// Wait until all is connected and ready
+		async.parallel(tasks, done);
 	}
 
 	if (process.env.CONFFILE === undefined) {
@@ -61,46 +65,60 @@ before(function(done) {
 	});
 });
 
+after(function(done) {
+	const	tasks	= [];
+
+	for (let i = 0; intercoms[i] !== undefined; i ++) {
+		const	intercom	= intercoms[i];
+		tasks.push(function(cb) {
+			intercom.close(cb);
+		});
+	}
+
+	async.parallel(tasks, done);
+});
+
 describe('Send, Recieve, Publish and Subscribe', function() {
 
-	it('Test Connection', function(done) {
-		const	Intercom	= require(__dirname + '/../index.js').Intercom,
-			intercom	= new Intercom(require(confFile).default);
+	it('check so the first intercom is up', function(done) {
+		const	intercom	= intercoms[0];
 
-		intercom.ready(done);
+		assert.notDeepEqual(intercom.handle,	undefined);
+		assert.notDeepEqual(intercom.handle.channel,	undefined);
+		done();
 	});
 
-	// We do this to ensure intercom is just called once per session.
-	it('Test parallel connection', function(done) {
-		const	Intercom	= require(__dirname + '/../index.js').Intercom,
-			intercom	= new Intercom(require(confFile).default);
+/** /
+	it('01: Publish simple message', function(done) {
+		const	orgMsg	= {'foo': 'bar'};
 
-		intercom.ready(done);
+		intercom11.subscribe(function(msg) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+
+			done();
+		}, function(err) {
+			if (err) throw err;
+
+			intercom12.publish(orgMsg);
+		});
 	});
-
+/**/
+/*
 	it('Send & Consume without publishing', function(done) {
-		const	queueName	= uuidLib.v4(),
+		const	exchangeName	= 'amq.fanout', //uuidLib.v4(),
+			queueName	= uuidLib.v4(),
+			orgMsg	= {'msg': 'Hello World'},
 			tasks	= [];
 
-		// Handle incoming consumed message
-		function handleCon(msg) {
-			assert.deepEqual(msg.content.toString(), 'Hello World');
-
-			// We wait 200ms to make sure no subscribed message is received in handleSub() before exiting
-			setTimeout(function() {
-				done();
-			}, 200);
-		}
-
-		// Handle incoming subscribed message
-		function handleSub(msg) {
-			throw new Error('No message should be received on this channel, but received: ' + msg.content.toString());
-		}
-
-		// Subscribe to queue (this shoul fail!)
+		// Subscribe to queue (this shoul never receive messages!)
 		tasks.push(function(cb) {
+			// Handle incoming subscribed message
+			function handleMsg(msg) {
+				throw new Error('No message should be received on this channel, but received: ' + JSON.stringify(msg));
+			}
+
 			// We subscribe on the exchange == queueName since this is the default if no exchange is given in the send
-			intercom11.subscribe({'exchange': queueName}, handleSub, function(err, result) {
+			intercom11.subscribe({'exchange': exchangeName}, handleMsg, function(err, result) {
 				if (err) throw err;
 
 				assert.notDeepEqual(result.consumerTag, undefined);
@@ -110,8 +128,18 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 
 		// Consume from queue
 		tasks.push(function(cb) {
+			// Handle incoming consumed message
+			function handleMsg(msg) {
+				assert.deepEqual(JSON.stringify(msg), JSON.stringify(orgMsg));
+
+				// We wait 200ms to make sure no subscribed message is received in handleSub() before exiting
+				setTimeout(function() {
+					done();
+				}, 200);
+			}
+
 			// Consume as opposed to subscribe.
-			intercom12.consume({'que': queueName}, handleCon, function(err, result) {
+			intercom12.consume({'que': queueName}, handleMsg, function(err, result) {
 				if (err) throw err;
 
 				assert.notDeepEqual(result.consumerTag, undefined);
@@ -122,16 +150,15 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		// Send to queue
 		tasks.push(function(cb) {
 			// Instantiate a new intercom connection and sends a message.
-			const	message	= 'Hello World';
-
-			intercom13.send({que: queueName, publish: false}, message, cb);
+			intercom13.send({'que': queueName, 'publish': false}, orgMsg, cb);
 		});
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
 		});
 	});
-
+/**/
+/*
 	it('Send & publish', function(done) {
 		const	exchangeName	= uuidLib.v4(),
 			queueName	= uuidLib.v4(),
@@ -182,5 +209,5 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 			intercom32.publish({'exchange': exchangeName}, 'Hello World');
 		});
 	});
-
+*/
 });

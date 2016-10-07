@@ -1,231 +1,106 @@
 'use strict';
 
-const	log	= require('winston'),
-	amqp	= require('amqplib/callback_api'),
-	events	= require('events');
+const	EventEmitter	= require('events').EventEmitter,
+	bramqp	= require('bramqp'),
+	async	= require('async'),
+	log	= require('winston'),
+	url	= require('url'),
+	net	= require('net');
 
-function Intercom(url) {
-	const that = this;
+/**
+ * Intercom
+ *
+ * Exposed stuff on object:
+ * socket - the network socket that speaks to RabbitMQ
+ * handle - return from bramqp.initialize() used to do lots of stuff
+ *
+ * Events
+ * .on('error', function(err)) - something serious happened!
+ */
+function Intercom(conStr) {
+	const	parsedConStr	= url.parse(conStr),
+		tasks	= [],
+		that	= this;
 
-	this.connected	= false;
-	this.eventEmitter	= new events.EventEmitter();
+	that.socket = net.connect({
+		'port': parsedConStr.port || 5672,
+		'host':	parsedConStr.hostname
+	});
 
-	amqp.connect(url, function(err, connection) {
+	// Create handle by socket connect to rabbitmq
+	tasks.push(function(cb) {
+		bramqp.initialize(that.socket, 'rabbitmq/full/amqp0-9-1.stripped.extended', function(err, result) {
+			if (err) {
+				log.error('larvitamintercom: Intercom() - Error connecting to RabbitMQ: ' + err.message);
+				that.emit('error', err);
+			}
+
+			that.handle = result;
+			cb(err);
+		});
+	});
+
+	// Open AMQP communication
+	tasks.push(function(cb) {
+		const	heartBeat	= true;
+		that.handle.openAMQPCommunication(parsedConStr.auth.split(':')[0], parsedConStr.auth.split(':')[1], heartBeat, function(err) {
+			if (err) {
+				log.error('larvitamintercom: Intercom() - Error opening AMQP communication: ' + err.message);
+				that.emit('error', err);
+			}
+
+			cb(err);
+		});
+	});
+
+	async.series(tasks, function(err) {
+		if ( ! err) {
+			that.emit('ready');
+		}
+	});
+
+/*
+	async.series([function(seriesCallback) {
+		handle.openAMQPCommunication('guest', 'guest', true, seriesCallback);
+	}, function(seriesCallback) {
+		handle.queue.declare(1, 'hello');
+		handle.once('1:queue.declare-ok', function(channel, method, data) {
+			console.log('queue declared');
+			seriesCallback();
+		});
+	}, function(seriesCallback) {
+		handle.basic.publish(1, '', 'hello', false, false, function() {
+			handle.content(1, 'basic', {}, 'Hello World!', seriesCallback);
+		});
+	}, function(seriesCallback) {
+		setTimeout(function() {
+			handle.closeAMQPCommunication(seriesCallback);
+		}, 10 * 1000);
+	}, function(seriesCallback) {
+		handle.socket.end();
+		setImmediate(seriesCallback);
+	}], function() {
+		console.log('all done');
+	});*/
+}
+
+// Make Intercom an event emitter
+Intercom.prototype.__proto__ = EventEmitter.prototype;
+
+// Close the RabbitMQ connection
+Intercom.prototype.close = function(cb) {
+	const	that = this;
+
+	that.handle.closeAMQPCommunication(function(err) {
 		if (err) {
-			log.error('larvitamintercom: Connection error: ' + err.message);
+			log.warn('larvitamintercom: close() - Could not closeAMQPCommunication: ' + err.message);
+			cb(err);
 			return;
 		}
 
-		that.connection	= connection;
-		that.connected	= true;
-		that.eventEmitter.emit('connected');
+		that.handle.socket.end();
+		setImmediate(cb);
 	});
 };
 
-/*
- * Send message to queue
- *
- * @param obj	msg	- object that will be sent as message. Must be serializable
- * @param obj	options	- object, optional
- * @param func	cb	- function(err) - will be invoked when the message is acked
- */
-Intercom.prototype.send = function(msg, options, cb) {
-	const	that	= this;
-
-	let	serializedMsg;
-
-	if (typeof options === 'function') {
-		cb	= options;
-		options	= {};
-	}
-
-	if (cb === undefined) {
-		cb	= function() {};
-	}
-
-	if (options === undefined) {
-		options = {};
-	}
-
-	if (options.que	=== undefined)	options.que	= '';
-	if (options.durable	=== undefined)	options.durable	= false;
-	if (options.publish	=== undefined)	options.publish	= true;
-	if (options.exchange	=== undefined)	options.exchange	= options.que;
-
-	try {
-		serializedMsg	= JSON.serialize(msg);
-		serializedMsg	= new Buffer(serializedMsg);
-	} catch(err) {
-		log.warn('larvitamintercom: send() - Could not serialize msg. Msg follows in next log entry');
-		log.warn('larvitamintercom: send() - Unserializable msg:', msg);
-		cb(err);
-		return;
-	}
-
-	this.ready(function() {
-		that.connection.createChannel(function(err, channel) {
-			if (err) {
-				log.error('larvitamintercom: send(): Channel error: ' + err.message);
-				cb(err);
-				return;
-			}
-
-			channel.assertQueue(options.que);
-			log.verbose('larvitamintercom: Sending message on que \'' + options.que + '\': ' + msg);
-			channel.sendToQueue(options.que, serializedMsg);
-
-			if (options.publish === true) {
-				that.publish(serializedMsg, {'exchange': options.exchange, 'msgSerialized': true}, cb);
-			} else {
-				cb();
-			}
-		});
-	});
-};
-
-// Consume messages directly from que;
-Intercom.prototype.consume = function(options, msgCb, cb) {
-	const	that	= this;
-
-	this.ready(function() {
-		if (options.que	=== undefined)	options.que	= '';
-		if (options.ack	=== undefined)	options.ack	= true;
-		if (cb	=== undefined)	cb	= function() {};
-
-		that.connection.createChannel(function(err, channel) {
-			if (err) {
-				log.error('larvitamintercom: consume() - Channel error: ' + err.message);
-				cb(err);
-				return;
-			}
-
-			channel.assertQueue(options.que);
-			log.verbose('larvitamintercom: consume() - Consuming messages on que: \'' + options.que + '\'');
-			channel.consume(options.que, function(rawMsg) {
-				let msg;
-
-				try {
-					msg	= JSON.parse(rawMsg.content.toString());
-				} catch(err) {
-					log.warn('larvitamintercom: consume() - Unparseable message: ' + rawMsg.content.toString());
-					msg = false;
-				}
-
-				msgCb(msg, rawMsg);
-			}, {'noAck': options.ack}, function(err, result) {
-				if (err) {
-					log.error('larvitamintercom: subscribe(): Subscribe error: ' + err.message);
-				}
-				cb(err, result);
-			});
-		});
-	});
-};
-
-// Publish messages on exchanges.
-Intercom.prototype.publish = function(msg, options, cb) {
-	const	that	= this;
-
-	let	serializedMsg,
-		bufferedMsg;
-
-	if (typeof options === 'function') {
-		cb	= options;
-		options	= {};
-	}
-
-	if (cb === undefined) {
-		cb = function() {};
-	}
-
-	if (options === undefined) {
-		options = {};
-	}
-
-	if (options.exchange	=== undefined)	options.exchange	= '';
-	if (options.type	=== undefined)	options.type	= 'fanout';
-
-	try {
-		serializedMsg	= JSON.serialize(msg);
-		bufferedMsg	= new Buffer(serializedMsg);
-	} catch(err) {
-		log.warn('larvitamintercom: publish() - Unserializable msg. Msg follows in separate log entry.');
-		log.warn('larvitamintercom: publish() - msg:', msg);
-	}
-
-	this.ready(function() {
-		that.connection.createChannel(function(err, channel) {
-			if (err) {
-				log.error('larvitamintercom: publish() - Channel error: ' + err.message);
-				cb(err);
-				return;
-			}
-
-			channel.assertExchange(options.exchange, options.type, {'durable': false});
-			log.verbose('larvitamintercom: publish() - Publishing message on exhange "' +  options.exchange + '": ' + serializedMsg);
-			channel.publish(options.exchange, '', bufferedMsg);
-			cb();
-		});
-	});
-};
-
-// Subscribe on messages on exhange.
-Intercom.prototype.subscribe = function(options, msgCb, cb) {
-	const	that	= this;
-
-	if (cb === undefined) {
-		cb = function() {};
-	}
-
-	if (options.exchange	=== undefined)	options.exchange	= '';
-	if (options.durable	=== undefined)	options.durable	= false;
-	if (options.type	=== undefined)	options.type	= 'fanout';
-	if (options.ack	=== undefined)	options.ack	= true;
-
-	this.ready(function() {
-		that.connection.createChannel(function(err, channel) {
-			if (err) {
-				log.error('larvitamintercom: subscribe() - Channel error: ' + err.message);
-				cb(err);
-				return;
-			}
-
-			channel.assertExchange(options.exchange, options.type, {'durable': options.durable});
-
-			channel.assertQueue('', {'exclusive': true}, function(err, q) {
-				log.info('larvitamintercom: subscribe() - Subscribing on exchange: "' + options.exchange + '"');
-				channel.bindQueue(q.queue, options.exchange, '');
-				channel.consume(q.queue, function(msg) {
-					let msg;
-
-					try {
-						msg	= JSON.parse(rawMsg.content.toString());
-					} catch(err) {
-						log.warn('larvitamintercom: subscribe() - Unparseable message: ' + rawMsg.content.toString());
-						msg = false;
-					}
-
-					msgCb(msg, rawMsg);
-				}, {'noAck': options.ack}, function(err, result) {
-					if (err) {
-						log.error('larvitamintercom: subscribe() - Subscribe error: ' + err.message);
-					}
-					cb(err, result);
-				});
-			});
-		});
-	});
-};
-
-// Send "connected" event when connection ready.
-Intercom.prototype.ready = function(cb) {
-	if (this.connected) {
-		cb();
-		return;
-	}
-
-	this.eventEmitter.on('connected', cb);
-};
-
-exports.Intercom	= Intercom;
-exports.ready	= this.ready;
+exports = module.exports = Intercom;
