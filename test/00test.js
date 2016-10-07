@@ -21,6 +21,8 @@ log.remove(log.transports.Console);
 /**/
 
 before(function(done) {
+	this.timeout(20000);
+
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
@@ -67,6 +69,8 @@ before(function(done) {
 
 after(function(done) {
 	const	tasks	= [];
+
+	this.timeout(20000);
 
 	for (let i = 0; intercoms[i] !== undefined; i ++) {
 		const	intercom	= intercoms[i];
