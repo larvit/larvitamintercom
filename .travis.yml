@@ -8,6 +8,8 @@ node_js:
   - 5
   - 6
 
+sudo: required
+
 notifications:
   email:
     - lilleman@larvit.se
