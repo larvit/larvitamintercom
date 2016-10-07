@@ -138,6 +138,53 @@ describe('Send and receive', function() {
 		});
 	});
 
+	// Sending a message to the default exchange
+	it('send and receive a message to a custom exchange', function(done) {
+		const	exchangeName	= 'customeOne',
+			orgMsg	= {'foo': 'bard'};
+
+		this.slow(1050); // > 525 is shown in yellow, 500ms is setTimeout()
+
+		let	//subscribed	= 0,
+			consumed	= 0;
+
+		intercoms[5].consume({'exchange': exchangeName}, function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			consumed ++;
+			ack();
+		});
+
+		intercoms[6].consume({'exchange': exchangeName}, function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			consumed ++;
+			ack();
+		});
+
+		/*intercoms[7].subscribe({'exchange': exchangeName}, function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			subscribed ++;
+			ack();
+		});
+
+		intercoms[8].subscribe({'exchange': exchangeName}, function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			subscribed ++;
+			ack();
+		});*/
+
+		intercoms[9].send(orgMsg, {'exchange': exchangeName}, function(err) {
+			if (err) throw err;
+
+			// Wait for a while to make sure consume() is not ran multiple times.
+			// This is not pretty, but I can not think of a better way
+			setTimeout(function() {
+				assert.deepEqual(consumed,	1);
+				//assert.deepEqual(subscribed,	2);
+				done();
+			}, 500);
+		});
+	});
+
 /** /
 	it('01: Publish simple message', function(done) {
 		const	orgMsg	= {'foo': 'bar'};

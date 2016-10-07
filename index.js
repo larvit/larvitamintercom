@@ -399,4 +399,8 @@ Intercom.prototype.send = function(message, options, cb) {
 	async.series(tasks, cb);
 };
 
+//Intercom.prototype.subscribe = function(options, msgCb, cb) {
+//
+//};
+
 exports = module.exports = Intercom;
