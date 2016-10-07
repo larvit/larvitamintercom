@@ -12,10 +12,10 @@ let	confFile;
 
 // Set up winston
 log.remove(log.transports.Console);
-/**/log.add(log.transports.Console, {
+/** /log.add(log.transports.Console, {
 	'colorize':	true,
 	'timestamp':	true,
-	'level':	'debug',
+	'level':	'verbose',
 	'json':	false
 });
 /**/
@@ -82,7 +82,7 @@ after(function(done) {
 	async.parallel(tasks, done);
 });
 
-describe('Send, Recieve, Publish and Subscribe', function() {
+describe('Send and receive', function() {
 
 	it('check so the first intercom is up', function(done) {
 		const	intercom	= intercoms[0];
@@ -93,25 +93,48 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 	});
 
 	// Sending a message to the default exchange
-	it('send a message to the default exchange', function(done) {
-		const	intercom	= intercoms[0];
+	it('send and receive a message to the default exchange', function(done) {
+		const	orgMsg	= {'foo': 'bar'};
 
-		intercom.send({'foo': 'bar'}, function(err) {
-			if (err) throw err;
+		this.slow(1050); // > 525 is shown in yellow, 500ms is setTimeout()
+
+		let	//subscribed	= 0,
+			consumed	= 0;
+
+		intercoms[0].consume(function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			consumed ++;
+			ack();
 		});
 
-		done();
-	});
-
-	it('consume from the default exchange', function(done) {
-		const	intercom	= intercoms[1];
-
-		intercom.consume(function(msg, ack) {
-			console.log('====== msg ======');
-			console.log(msg);
-			console.log('==== / msg ======');
+		intercoms[1].consume(function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			consumed ++;
 			ack();
-			done();
+		});
+
+		/*intercoms[2].subscribe(function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			subscribed ++;
+			ack();
+		});
+
+		intercoms[3].subscribe(function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			subscribed ++;
+			ack();
+		});*/
+
+		intercoms[4].send(orgMsg, function(err) {
+			if (err) throw err;
+
+			// Wait for a while to make sure consume() is not ran multiple times.
+			// This is not pretty, but I can not think of a better way
+			setTimeout(function() {
+				assert.deepEqual(consumed,	1);
+				//assert.deepEqual(subscribed,	2);
+				done();
+			}, 500);
 		});
 	});
 
