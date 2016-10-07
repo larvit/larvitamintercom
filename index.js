@@ -192,10 +192,13 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 				console.log('className:');
 				console.log(className);
 
-				that.handle.basic.ack(1, data['delivery-tag']);
-
-				//that.handle.basic.ack()
-				msgCb(content);
+				msgCb(content, function(err) {
+					if (err) {
+						that.handle.basic.nack(that.channelName, data['delivery-tag']);
+					} else {
+						that.handle.basic.ack(that.channelName, data['delivery-tag']);
+					}
+				});
 			});
 		});
 

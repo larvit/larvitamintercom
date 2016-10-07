@@ -55,18 +55,15 @@ const	Intercom	= require('larvitamintercom'),
 
 let options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
 
-intercom.consume(options, function(message, ack, rawMsg) {
+intercom.consume(options, function(message, ack) {
 	// message being the object sent with intercom.send()
-	// rawMsg being an object with lots of stuff directly from RabbitMQ
-	// message === JSON.parse(rawMsg.content.toString())
 
 	// Must be ran! Always! ACK!!
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err, result) {
+}, function(err) {
 	// Callback from established consume connection
-	// TODO: find out what result is
 });
 
 ```
@@ -88,18 +85,15 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'exchange': 'default'};
 
-intercom.subscribe(options, function(message, ack, rawMsg) {
+intercom.subscribe(options, function(message, ack) {
 	// message subscribe the object sent with intercom.send()
-	// rawMsg being an object with lots of stuff directly from RabbitMQ
-	// message === JSON.parse(rawMsg.content.toString())
 
 	// Must be ran! Always! ACK!!
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err, result) {
+}, function(err) {
 	// Callback from established subscribe connection
-	// TODO: find out what result is
 });
 ```
 

@@ -106,10 +106,11 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 	it('consume from the default exchange', function(done) {
 		const	intercom	= intercoms[1];
 
-		intercom.consume(function(msg) {
+		intercom.consume(function(msg, ack) {
 			console.log('====== msg ======');
 			console.log(msg);
 			console.log('==== / msg ======');
+			ack();
 			done();
 		});
 	});
