@@ -286,8 +286,8 @@ Intercom.prototype.declareQueue = function(options, cb) {
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.arguments
 		that	= this;
 
-	if (options.queueName	=== undefined)	{ options.queueName	= null;	}
-	if (options.exclusive	=== undefined)	{ options.exclusive	= false;	}
+	if ( ! options.queueName)	{ options.queueName	= '';	}
+	if (options.exclusive === undefined)	{ options.exclusive	= false;	}
 
 	log.verbose('larvitamintercom: declareQueue() - Declaring. queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
 
@@ -296,17 +296,12 @@ Intercom.prototype.declareQueue = function(options, cb) {
 			log.error('larvitamintercom: declareQueue() - Could not declare queue, name: "' + options.queueName + '" err: ' + err.message);
 		}
 
-		log.debug('larvitamintercom: declareQueue() - Declared! queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
-
-		cb(err);
+		that.handle.once(that.channelName + ':queue.declare-ok', function(channel, method, data) {
+			const queueName = data.queue;
+			log.debug('larvitamintercom: declareQueue() - Declared! queueName: "' + queueName + '" exclusive: ' + options.exclusive.toString());
+			cb(err, queueName);
+		});
 	});
-
-	/* Alternate cb method
-	that.handle.once('1:queue.declare-ok', function(channel, method, data) {
-		console.log('queue declared');
-		queueName = data.queue;
-		seriesCallback();
-	});*/
 };
 
 Intercom.prototype.send = function(message, options, cb) {
@@ -399,8 +394,103 @@ Intercom.prototype.send = function(message, options, cb) {
 	async.series(tasks, cb);
 };
 
-//Intercom.prototype.subscribe = function(options, msgCb, cb) {
-//
-//};
+Intercom.prototype.subscribe = function(options, msgCb, cb) {
+	const	tasks	= [],
+		that	= this;
+
+	let	queueName;
+
+	if (typeof options === 'function') {
+		cb	= msgCb;
+		msgCb	= options;
+		options	= {};
+	}
+
+	if (cb === undefined) {
+		cb = function() {};
+	}
+
+	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
+
+	log.verbose('larvitamintercom: consume() - Starting on exchange "' + options.exchange + '"');
+
+	// Declare exchange
+	tasks.push(function(cb) {
+		that.declareExchange(options.exchange, cb);
+	});
+
+	// Declare queue
+	tasks.push(function(cb) {
+		that.declareQueue({'exclusive': true}, function(err, result) {
+			if (err) throw err;
+
+			queueName = result;
+			cb();
+		});
+	});
+
+	// Bind queue
+	tasks.push(function(cb) {
+		that.bindQueue(queueName, options.exchange, cb);
+	});
+
+	// Start consuming
+	tasks.push(function(cb) {
+		const	consumerTag	= null,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.consumer-tag
+			noLocal	= false,	// "If the no-local field is set the server will not send messages to the connection
+					// that published them." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+			noWait	= false,	// "If set, the server will not respond to the method. The client should not wait
+					// for a reply method. If the server could not complete the method it will raise a
+					// channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+			noAck	= false,	// "If this field is set the server does not expect acknowledgements for messages.
+					// That is, when a message is delivered to the client the server assumes the delivery
+					// will succeed and immediately dequeues it. This functionality may increase performance
+					// but at the cost of reliability. Messages can get lost if a client dies before they
+					// are delivered to the application." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+			exclusive	= false,	// Request exclusive consumer access, meaning only this consumer can access the queue.
+			args	= {};	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
+
+		that.handle.basic.consume(that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args);
+		that.handle.once(that.channelName + ':basic.consume-ok', function(channel, method, data) {
+			log.verbose('larvitamintercom: subscribe() - Started consuming with consumer tag: "' + data['consumer-tag'] + '"');
+			cb();
+		});
+	});
+
+	// Register msgCb
+	tasks.push(function(cb) {
+		that.handle.on(that.channelName + ':basic.deliver', function(channel, method, data) {
+			const	deliveryTag	= data['delivery-tag'];
+
+			log.debug('larvitamintercom: subscribe() - Incoming message, deliveryTag: "' + deliveryTag + '"');
+
+			that.handle.once('content', function(channel, className, properties, content) {
+				let	message;
+
+				try {
+					message = JSON.parse(content.toString());
+				} catch(err) {
+					log.warn('larvitamintercom: subscribe() - Could not parse incoming message. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
+					cb(err);
+					return;
+				}
+
+				msgCb(message, function(err) {
+					if (err) {
+						log.warn('larvitamintercom: subscribe() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
+						that.handle.basic.nack(that.channelName, deliveryTag);
+					} else {
+						log.debug('larvitamintercom: subscribe() - ack on deliveryTag: "' + deliveryTag + '"');
+						that.handle.basic.ack(that.channelName, deliveryTag);
+					}
+				});
+			});
+		});
+
+		cb();
+	});
+
+	async.series(tasks, cb);
+};
 
 exports = module.exports = Intercom;

@@ -96,9 +96,10 @@ describe('Send and receive', function() {
 	it('send and receive a message to the default exchange', function(done) {
 		const	orgMsg	= {'foo': 'bar'};
 
-		this.slow(1050); // > 525 is shown in yellow, 500ms is setTimeout()
+		this.timeout(2500);
+		this.slow(2100); // > 1050 is shown in yellow, 1000ms is setTimeout()
 
-		let	//subscribed	= 0,
+		let	subscribed	= 0,
 			consumed	= 0;
 
 		intercoms[0].consume(function(msg, ack) {
@@ -113,7 +114,7 @@ describe('Send and receive', function() {
 			ack();
 		});
 
-		/*intercoms[2].subscribe(function(msg, ack) {
+		intercoms[2].subscribe(function(msg, ack) {
 			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 			subscribed ++;
 			ack();
@@ -123,7 +124,7 @@ describe('Send and receive', function() {
 			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 			subscribed ++;
 			ack();
-		});*/
+		});
 
 		intercoms[4].send(orgMsg, function(err) {
 			if (err) throw err;
@@ -132,9 +133,9 @@ describe('Send and receive', function() {
 			// This is not pretty, but I can not think of a better way
 			setTimeout(function() {
 				assert.deepEqual(consumed,	1);
-				//assert.deepEqual(subscribed,	2);
+				assert.deepEqual(subscribed,	2);
 				done();
-			}, 500);
+			}, 1000);
 		});
 	});
 
@@ -143,9 +144,10 @@ describe('Send and receive', function() {
 		const	exchangeName	= 'customeOne',
 			orgMsg	= {'foo': 'bard'};
 
-		this.slow(1050); // > 525 is shown in yellow, 500ms is setTimeout()
+		this.timeout(2500);
+		this.slow(2100); // > 1050 is shown in yellow, 1000ms is setTimeout()
 
-		let	//subscribed	= 0,
+		let	subscribed	= 0,
 			consumed	= 0;
 
 		intercoms[5].consume({'exchange': exchangeName}, function(msg, ack) {
@@ -160,7 +162,7 @@ describe('Send and receive', function() {
 			ack();
 		});
 
-		/*intercoms[7].subscribe({'exchange': exchangeName}, function(msg, ack) {
+		intercoms[7].subscribe({'exchange': exchangeName}, function(msg, ack) {
 			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 			subscribed ++;
 			ack();
@@ -170,7 +172,7 @@ describe('Send and receive', function() {
 			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 			subscribed ++;
 			ack();
-		});*/
+		});
 
 		intercoms[9].send(orgMsg, {'exchange': exchangeName}, function(err) {
 			if (err) throw err;
@@ -179,132 +181,9 @@ describe('Send and receive', function() {
 			// This is not pretty, but I can not think of a better way
 			setTimeout(function() {
 				assert.deepEqual(consumed,	1);
-				//assert.deepEqual(subscribed,	2);
+				assert.deepEqual(subscribed,	2);
 				done();
-			}, 500);
+			}, 1000);
 		});
 	});
-
-/** /
-	it('01: Publish simple message', function(done) {
-		const	orgMsg	= {'foo': 'bar'};
-
-		intercom11.subscribe(function(msg) {
-			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-
-			done();
-		}, function(err) {
-			if (err) throw err;
-
-			intercom12.publish(orgMsg);
-		});
-	});
-/**/
-/*
-	it('Send & Consume without publishing', function(done) {
-		const	exchangeName	= 'amq.fanout', //uuidLib.v4(),
-			queueName	= uuidLib.v4(),
-			orgMsg	= {'msg': 'Hello World'},
-			tasks	= [];
-
-		// Subscribe to queue (this shoul never receive messages!)
-		tasks.push(function(cb) {
-			// Handle incoming subscribed message
-			function handleMsg(msg) {
-				throw new Error('No message should be received on this channel, but received: ' + JSON.stringify(msg));
-			}
-
-			// We subscribe on the exchange == queueName since this is the default if no exchange is given in the send
-			intercom11.subscribe({'exchange': exchangeName}, handleMsg, function(err, result) {
-				if (err) throw err;
-
-				assert.notDeepEqual(result.consumerTag, undefined);
-				cb();
-			});
-		});
-
-		// Consume from queue
-		tasks.push(function(cb) {
-			// Handle incoming consumed message
-			function handleMsg(msg) {
-				assert.deepEqual(JSON.stringify(msg), JSON.stringify(orgMsg));
-
-				// We wait 200ms to make sure no subscribed message is received in handleSub() before exiting
-				setTimeout(function() {
-					done();
-				}, 200);
-			}
-
-			// Consume as opposed to subscribe.
-			intercom12.consume({'que': queueName}, handleMsg, function(err, result) {
-				if (err) throw err;
-
-				assert.notDeepEqual(result.consumerTag, undefined);
-				cb();
-			});
-		});
-
-		// Send to queue
-		tasks.push(function(cb) {
-			// Instantiate a new intercom connection and sends a message.
-			intercom13.send({'que': queueName, 'publish': false}, orgMsg, cb);
-		});
-
-		async.series(tasks, function(err) {
-			if (err) throw err;
-		});
-	});
-/**/
-/*
-	it('Send & publish', function(done) {
-		const	exchangeName	= uuidLib.v4(),
-			queueName	= uuidLib.v4(),
-			tasks	= [];
-
-		// Subscribe on testExchange2, send and publish message.
-		tasks.push(function(cb) {
-			intercom21.subscribe({'exchange': exchangeName}, function(msg) {
-				assert.deepEqual(msg.content.toString(), 'Hello World');
-				cb();
-			}, function(err, result) {
-				if (err) throw err;
-
-				assert(result.consumerTag !== undefined);
-
-				const	message	= 'Hello World';
-				intercom22.send({'que': queueName, 'exchange': exchangeName}, message);
-			});
-		});
-
-		// Consume messages on testQue2.
-		tasks.push(function(cb) {
-			intercom23.consume({'que': queueName}, function(msg) {
-				assert.deepEqual(msg.content.toString(), 'Hello World');
-				cb();
-			}, function(err, result) {
-				if (err) throw err;
-				assert(result.consumerTag !== undefined);
-			});
-		});
-
-		async.series(tasks, function(err) {
-			if (err) throw err;
-			done();
-		});
-	});
-
-	it('Subscribe & Publish', function(done) {
-		const	exchangeName	= uuidLib.v4();
-
-		intercom31.subscribe({'exchange': exchangeName}, function(msg) {
-			assert.deepEqual(msg.content.toString(), 'Hello World');
-			done();
-		}, function(err, result) {
-			if (err) throw err;
-
-			assert(result.consumerTag !== undefined);
-			intercom32.publish({'exchange': exchangeName}, 'Hello World');
-		});
-	});
-*/
 });

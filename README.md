@@ -101,6 +101,6 @@ intercom.subscribe(options, function(message, ack) {
 
 ```javascript
 {
-	'exchange':	''
+	'exchange':	'default'
 }
 ```
