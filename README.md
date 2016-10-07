@@ -88,7 +88,7 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'exchange': 'default'};
 
-intercom.consume(options, function(message, ack, rawMsg) {
+intercom.subscribe(options, function(message, ack, rawMsg) {
 	// message subscribe the object sent with intercom.send()
 	// rawMsg being an object with lots of stuff directly from RabbitMQ
 	// message === JSON.parse(rawMsg.content.toString())

@@ -92,8 +92,7 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		done();
 	});
 
-	// Sending a message to the default exchange, this should result in nothing
-	// since no consumers are connected
+	// Sending a message to the default exchange
 	it('send a message to the default exchange', function(done) {
 		const	intercom	= intercoms[0];
 
@@ -102,6 +101,17 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		});
 
 		done();
+	});
+
+	it('consume from the default exchange', function(done) {
+		const	intercom	= intercoms[1];
+
+		intercom.consume(function(msg) {
+			console.log('====== msg ======');
+			console.log(msg);
+			console.log('==== / msg ======');
+			done();
+		});
 	});
 
 /** /
