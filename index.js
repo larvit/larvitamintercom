@@ -22,6 +22,8 @@ function Intercom(conStr) {
 		tasks	= [],
 		that	= this;
 
+	that.channelName	= 1;
+
 	that.socket = net.connect({
 		'port': parsedConStr.port || 5672,
 		'host':	parsedConStr.hostname
@@ -111,6 +113,65 @@ Intercom.prototype.close = function(cb) {
 		that.handle.socket.end();
 		setImmediate(cb);
 	});
+};
+
+Intercom.prototype.send = function(message, options, cb) {
+	const	properties	= {'content-type': 'application/json'},
+		mandatory	= true,
+		immediate	= false,
+		className	= 'basic',
+		that	= this;
+
+	let	stringifiedMsg;
+
+	if (typeof options === 'function') {
+		cb	= options;
+		options	= {};
+	}
+
+	if (cb === undefined) {
+		cb = function() {};
+	}
+
+	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
+
+	try {
+		stringifiedMsg = JSON.stringify(message);
+	} catch(err) {
+		log.warn('larvitamintercom: send() - Could not stringify message. Message attached to next log call.');
+		log.warn('larvitamintercom: send() - Unstringifiable message attached:', message);
+		cb(err);
+		return;
+	}
+
+	log.verbose('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+
+	that.handle.basic.publish(
+		that.channelName,
+		options.exchange,
+		'ignored-routing-key',
+		mandatory,
+		immediate,
+		function(err) {
+			if (err) {
+				log.warn('larvitamintercom: send() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ' message: "' + stringifiedMsg + '"');
+				cb(err);
+				return;
+			}
+
+			log.debug('larvitamintercom: send() - Published (no content sent) to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+
+			that.handle.content(that.channelName, className, properties, stringifiedMsg, function(err) {
+				if (err) {
+					log.warn('larvitamintercom: send() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ' message: "' + stringifiedMsg + '"');
+				}
+
+				log.debug('larvitamintercom: send() - Content sent to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+
+				cb(err);
+			});
+		}
+	);
 };
 
 exports = module.exports = Intercom;

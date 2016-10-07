@@ -16,7 +16,7 @@ const	Intercom	= require('larvitamintercom'),
 	intercom	= new Intercom(conStr);
 
 let	message	= {'hello':	'world'},
-	options	= {'exchange':	'default'}; // Will default to "default" if options is omitted
+	options	= {'exchange':	'foo'}; // Will default to "default" if options is omitted
 
 intercom.send(message, options, function(err) {
 	// called when message is accepted by queue handler
@@ -53,7 +53,7 @@ const	Intercom	= require('larvitamintercom'),
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-let options = {'exchange': 'default'}; // Will default to "default" if options is omitted
+let options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
 
 intercom.consume(options, function(message, ack, rawMsg) {
 	// message being the object sent with intercom.send()
@@ -107,6 +107,6 @@ intercom.consume(options, function(message, ack, rawMsg) {
 
 ```javascript
 {
-	'exchange':	'default'
+	'exchange':	''
 }
 ```

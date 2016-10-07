@@ -92,6 +92,18 @@ describe('Send, Recieve, Publish and Subscribe', function() {
 		done();
 	});
 
+	// Sending a message to the default exchange, this should result in nothing
+	// since no consumers are connected
+	it('send a message to the default exchange', function(done) {
+		const	intercom	= intercoms[0];
+
+		intercom.send({'foo': 'bar'}, function(err) {
+			if (err) throw err;
+		});
+
+		done();
+	});
+
 /** /
 	it('01: Publish simple message', function(done) {
 		const	orgMsg	= {'foo': 'bar'};
