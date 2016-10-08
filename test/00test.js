@@ -26,7 +26,7 @@ before(function(done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 10; i ++) {
+		for (let i = 0; i < 11; i ++) {
 			tasks.push(function(cb) {
 				const	intercom	= new Intercom(config);
 
@@ -184,6 +184,21 @@ describe('Send and receive', function() {
 				assert.deepEqual(subscribed,	2);
 				done();
 			}, 1000);
+		});
+	});
+
+	it('send and receive on the same Intercom', function(done) {
+		const	exchangeName	= 'sameInstance',
+			orgMsg	= {'bi': 'bu'};
+
+		intercoms[10].subscribe({'exchange': exchangeName}, function(msg, ack) {
+			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+			ack();
+			done();
+		});
+
+		intercoms[10].send(orgMsg, {'exchange': exchangeName}, function(err) {
+			if (err) throw err;
 		});
 	});
 });
