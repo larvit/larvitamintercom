@@ -56,8 +56,10 @@ const	Intercom	= require('larvitamintercom'),
 
 let options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
 
-intercom.consume(options, function(message, ack) {
+intercom.consume(options, function(message, ack, deliveryTag) {
 	// message being the object sent with intercom.send()
+
+	// deliveryTag is an identification of this delivery
 
 	// Must be ran! Always! ACK!!
 	ack();
@@ -86,8 +88,10 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'exchange': 'default'};
 
-intercom.subscribe(options, function(message, ack) {
+intercom.subscribe(options, function(message, ack, deliveryTag) {
 	// message subscribe the object sent with intercom.send()
+
+	// deliveryTag is an identification of this delivery
 
 	// Must be ran! Always! ACK!!
 	ack();
