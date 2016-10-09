@@ -2,7 +2,6 @@
 
 const	intercoms	= [],
 	Intercom	= require(__dirname + '/../index.js'),
-	//uuidLib	= require('uuid'), // Used to make unique exchange and queue names
 	assert	= require('assert'),
 	async	= require('async'),
 	log	= require('winston'),
