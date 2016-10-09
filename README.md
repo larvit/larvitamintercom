@@ -41,6 +41,7 @@ There are two types of read operations; "consume" and "subscribe".
 A message can only be "consumed" once, but it can be "subscribed" several times, by different readers.
 
 Consumers can be assigned to an exchanged after the message have been sent, and they still receive the message.
+However, very importantly, ONE consumer must be assigned before the send happends, or the consumer queue never gets declared!
 
 Subscribers, in contrast, must subscribe BEFORE the message is sent or they will not receive it.
 

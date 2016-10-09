@@ -212,7 +212,7 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 						log.debug('larvitamintercom: consume() - ack on deliveryTag: "' + deliveryTag + '"');
 						that.handle.basic.ack(that.channelName, deliveryTag);
 					}
-				});
+				}, deliveryTag);
 			});
 		});
 
@@ -308,8 +308,7 @@ Intercom.prototype.send = function(message, options, cb) {
 	const	tasks	= [],
 		that	= this;
 
-	let	stringifiedMsg,
-		queueName;
+	let	stringifiedMsg;
 
 	if (typeof options === 'function') {
 		cb	= options;
@@ -321,8 +320,6 @@ Intercom.prototype.send = function(message, options, cb) {
 	}
 
 	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
-
-	queueName	= 'queTo_' + options.exchange;
 
 	try {
 		stringifiedMsg = JSON.stringify(message);
@@ -338,16 +335,6 @@ Intercom.prototype.send = function(message, options, cb) {
 	// Declare exchange
 	tasks.push(function(cb) {
 		that.declareExchange(options.exchange, cb);
-	});
-
-	// Declare persistent work queue for consumers
-	tasks.push(function(cb) {
-		that.declareQueue({'queueName': queueName}, cb);
-	});
-
-	// Bind work queue
-	tasks.push(function(cb) {
-		that.bindQueue(queueName, options.exchange, cb);
 	});
 
 	// Publish
@@ -483,7 +470,7 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 						log.debug('larvitamintercom: subscribe() - ack on deliveryTag: "' + deliveryTag + '"');
 						that.handle.basic.ack(that.channelName, deliveryTag);
 					}
-				});
+				}, deliveryTag);
 			});
 		});
 
