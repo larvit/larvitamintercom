@@ -18,10 +18,9 @@ const	Intercom	= require('larvitamintercom'),
 let	message	= {'hello':	'world'},
 	options	= {'exchange':	'foo'}; // Will default to "default" if options is omitted
 
-intercom.send(message, options, function(err) {
+intercom.send(message, options, function(err, msgUuid) {
 	// called when message is accepted by queue handler
-}, function(err) {
-	// called when all consumeres have acked the message
+	// msgUuid will be a unique UUID for this specific message
 });
 ```
 
@@ -41,6 +40,7 @@ There are two types of read operations; "consume" and "subscribe".
 A message can only be "consumed" once, but it can be "subscribed" several times, by different readers.
 
 Consumers can be assigned to an exchanged after the message have been sent, and they still receive the message.
+However, very importantly, ONE consumer must be assigned before the send happends, or the consumer queue never gets declared!
 
 Subscribers, in contrast, must subscribe BEFORE the message is sent or they will not receive it.
 
@@ -55,8 +55,10 @@ const	Intercom	= require('larvitamintercom'),
 
 let options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
 
-intercom.consume(options, function(message, ack) {
+intercom.consume(options, function(message, ack, deliveryTag) {
 	// message being the object sent with intercom.send()
+
+	// deliveryTag is an identification of this delivery
 
 	// Must be ran! Always! ACK!!
 	ack();
@@ -85,8 +87,10 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'exchange': 'default'};
 
-intercom.subscribe(options, function(message, ack) {
+intercom.subscribe(options, function(message, ack, deliveryTag) {
 	// message subscribe the object sent with intercom.send()
+
+	// deliveryTag is an identification of this delivery
 
 	// Must be ran! Always! ACK!!
 	ack();
