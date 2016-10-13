@@ -201,4 +201,35 @@ describe('Send and receive', function() {
 			if (err) throw err;
 		});
 	});
+
+	it('send and receive multiple messages on the same Intercom', function(done) {
+		const	exchangeName	= 'sameInstance',
+			orgMsg1	= {'bi': 'bu'},
+			orgMsg2	= {'waff': 'woff'};
+
+		let	msg1Received = 0,
+			msg2Received = 0;
+
+		intercoms[10].subscribe({'exchange': exchangeName}, function(msg, ack) {
+			if (JSON.stringify(msg) === JSON.stringify(orgMsg1)) {
+				msg1Received ++;
+				ack();
+			} else if (JSON.stringify(msg) === JSON.stringify(orgMsg2)) {
+				msg2Received ++;
+				ack();
+			}
+
+			if (msg1Received === 1 && msg2Received === 1) {
+				done();
+			}
+		});
+
+		intercoms[10].send(orgMsg1, {'exchange': exchangeName}, function(err) {
+			if (err) throw err;
+		});
+
+		intercoms[10].send(orgMsg2, {'exchange': exchangeName}, function(err) {
+			if (err) throw err;
+		});
+	});
 });
