@@ -1,7 +1,9 @@
 'use strict';
 
 const	EventEmitter	= require('events').EventEmitter,
+	uuidLib	= require('node-uuid'),
 	bramqp	= require('bramqp'),
+	lUtils	= require('larvitutils'),
 	async	= require('async'),
 	log	= require('winston'),
 	url	= require('url'),
@@ -204,6 +206,10 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 					return;
 				}
 
+				if (lUtils.formatUuid(message.uuid) === false) {
+					log.warn('larvitamintercom: consume() - Message does not contain uuid. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
+				}
+
 				msgCb(message, function(err) {
 					if (err) {
 						log.warn('larvitamintercom: consume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
@@ -304,8 +310,16 @@ Intercom.prototype.declareQueue = function(options, cb) {
 	});
 };
 
-Intercom.prototype.send = function(message, options, cb) {
-	const	tasks	= [],
+/**
+ * Send something
+ *
+ * @param obj message - message will be appended with an uuid if that does not exist
+ * @param obj options - OPTIONAL - options.exchange = str
+ * @param func cb(err, message assigned uuid)
+ */
+Intercom.prototype.send = function(orgMsg, options, cb) {
+	const	message	= require('util')._extend({}, orgMsg),
+		tasks	= [],
 		that	= this;
 
 	let	stringifiedMsg;
@@ -322,6 +336,10 @@ Intercom.prototype.send = function(message, options, cb) {
 	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
 
 	try {
+		if (message.uuid === undefined) {
+			message.uuid = uuidLib.v4();
+		}
+
 		stringifiedMsg = JSON.stringify(message);
 	} catch(err) {
 		log.warn('larvitamintercom: send() - Could not stringify message. Message attached to next log call.');
@@ -330,7 +348,7 @@ Intercom.prototype.send = function(message, options, cb) {
 		return;
 	}
 
-	log.debug('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+	log.debug('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
 	// Declare exchange
 	tasks.push(function(cb) {
@@ -350,12 +368,12 @@ Intercom.prototype.send = function(message, options, cb) {
 			immediate,
 			function(err) {
 				if (err) {
-					log.warn('larvitamintercom: send() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ' message: "' + stringifiedMsg + '"');
+					log.warn('larvitamintercom: send() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 					cb(err);
 					return;
 				}
 
-				log.debug('larvitamintercom: send() - Published (no content sent) to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+				log.debug('larvitamintercom: send() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
 				cb();
 			}
@@ -369,16 +387,18 @@ Intercom.prototype.send = function(message, options, cb) {
 
 		that.handle.content(that.channelName, className, properties, stringifiedMsg, function(err) {
 			if (err) {
-				log.warn('larvitamintercom: send() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ' message: "' + stringifiedMsg + '"');
+				log.warn('larvitamintercom: send() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 			}
 
-			log.debug('larvitamintercom: send() - Content sent to exchange: "' + options.exchange + '", message: "' + stringifiedMsg + '"');
+			log.debug('larvitamintercom: send() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
 			cb(err);
 		});
 	});
 
-	async.series(tasks, cb);
+	async.series(tasks, function(err) {
+		cb(err, message.uuid);
+	});
 };
 
 Intercom.prototype.subscribe = function(options, msgCb, cb) {
@@ -460,6 +480,10 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 					log.warn('larvitamintercom: subscribe() - Could not parse incoming message. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
 					cb(err);
 					return;
+				}
+
+				if (lUtils.formatUuid(message.uuid) === false) {
+					log.warn('larvitamintercom: consume() - Message does not contain uuid. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
 				}
 
 				msgCb(message, function(err) {
