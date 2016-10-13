@@ -18,10 +18,9 @@ const	Intercom	= require('larvitamintercom'),
 let	message	= {'hello':	'world'},
 	options	= {'exchange':	'foo'}; // Will default to "default" if options is omitted
 
-intercom.send(message, options, function(err) {
+intercom.send(message, options, function(err, msgUuid) {
 	// called when message is accepted by queue handler
-}, function(err) {
-	// called when all consumeres have acked the message
+	// msgUuid will be a unique UUID for this specific message
 });
 ```
 
