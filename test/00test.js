@@ -70,7 +70,7 @@ before(function(done) {
 after(function(done) {
 	const	tasks	= [];
 
-	this.timeout(20000);
+	this.timeout(10000);
 
 	for (let i = 0; intercoms[i] !== undefined; i ++) {
 		const	intercom	= intercoms[i];
@@ -83,7 +83,7 @@ after(function(done) {
 });
 
 describe('Send and receive', function() {
-
+/**/
 	it('check so the first intercom is up', function(done) {
 		const	intercom	= intercoms[0];
 
@@ -222,7 +222,7 @@ describe('Send and receive', function() {
 			});
 		});
 	});
-/*
+
 	it('send and receive multiple messages on different Intercoms', function(done) {
 		const	exchangeName	= 'anotherInstance',
 			orgMsg1	= {'ba': 'bo'},
@@ -273,21 +273,23 @@ describe('Send and receive', function() {
 				ack();
 			}
 
-			if (msg1Received === 1 && msg2Received === 1) {
+			if (msg1Received === 10 && msg2Received === 10) {
 				done();
 			}
 		}, function(err) {
 			if (err) throw err;
-			intercoms[13].send(orgMsg1, {'exchange': exchangeName}, function(err) {
-				if (err) throw err;
-			});
 
+			for (let i = 0; i !== 10; i ++) {
+				intercoms[13].send(orgMsg1, {'exchange': exchangeName}, function(err) {
+					if (err) throw err;
+				});
 
-			intercoms[13].send(orgMsg2, {'exchange': exchangeName}, function(err) {
-				if (err) throw err;
-			});
+				intercoms[13].send(orgMsg2, {'exchange': exchangeName}, function(err) {
+					if (err) throw err;
+				});
+			}
 		});
 
 	});
-*/
+
 });
