@@ -26,7 +26,7 @@ before(function(done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 11; i ++) {
+		for (let i = 0; i < 14; i ++) {
 			tasks.push(function(cb) {
 				const	intercom	= new Intercom(config);
 
@@ -223,19 +223,19 @@ describe('Send and receive', function() {
 		});
 	});
 
-	it('send and receive multiple messages on the same Intercom', function(done) {
-		const	exchangeName	= 'sameInstance',
-			orgMsg1	= {'bi': 'bu'},
+	it('send and receive multiple messages on different Intercoms', function(done) {
+		const	exchangeName	= 'anotherInstance',
+			orgMsg1	= {'ba': 'bo'},
 			orgMsg2	= {'waff': 'woff'};
 
 		let	msg1Received = 0,
 			msg2Received = 0;
 
-		intercoms[10].subscribe({'exchange': exchangeName}, function(msg, ack) {
-			if (JSON.stringify(msg) === JSON.stringify(orgMsg1)) {
+		intercoms[11].subscribe({'exchange': exchangeName}, function(msg, ack) {
+			if (JSON.stringify(msg.ba) === JSON.stringify(orgMsg1.ba)) {
 				msg1Received ++;
 				ack();
-			} else if (JSON.stringify(msg) === JSON.stringify(orgMsg2)) {
+			} else if (JSON.stringify(msg.waff) === JSON.stringify(orgMsg2.waff)) {
 				msg2Received ++;
 				ack();
 			}
@@ -243,14 +243,51 @@ describe('Send and receive', function() {
 			if (msg1Received === 1 && msg2Received === 1) {
 				done();
 			}
-		});
-
-		intercoms[10].send(orgMsg1, {'exchange': exchangeName}, function(err) {
+		}, function(err) {
 			if (err) throw err;
-		});
 
-		intercoms[10].send(orgMsg2, {'exchange': exchangeName}, function(err) {
-			if (err) throw err;
+			intercoms[11].send(orgMsg1, {'exchange': exchangeName}, function(err) {
+				if (err) throw err;
+			});
+
+			intercoms[12].send(orgMsg2, {'exchange': exchangeName}, function(err) {
+				if (err) throw err;
+			});
 		});
 	});
+
+	it('send and receive multiple messages on the same Intercom', function(done) {
+		const	exchangeName	= 'yetAnotherInstance',
+			orgMsg1	= {'bar': 'bor'},
+			orgMsg2	= {'waffer': 'woffer'};
+
+		let	msg1Received = 0,
+			msg2Received = 0;
+
+		intercoms[13].subscribe({'exchange': exchangeName}, function(msg, ack) {
+			if (JSON.stringify(msg.bar) === JSON.stringify(orgMsg1.bar)) {
+				msg1Received ++;
+				ack();
+			} else if (JSON.stringify(msg.waffer) === JSON.stringify(orgMsg2.waffer)) {
+				msg2Received ++;
+				ack();
+			}
+
+			if (msg1Received === 1 && msg2Received === 1) {
+				done();
+			}
+		}, function(err) {
+			if (err) throw err;
+			intercoms[13].send(orgMsg1, {'exchange': exchangeName}, function(err) {
+				if (err) throw err;
+			});
+
+
+			intercoms[13].send(orgMsg2, {'exchange': exchangeName}, function(err) {
+				if (err) throw err;
+			});
+		});
+
+	});
+
 });
