@@ -222,7 +222,7 @@ describe('Send and receive', function() {
 			});
 		});
 	});
-
+/*
 	it('send and receive multiple messages on different Intercoms', function(done) {
 		const	exchangeName	= 'anotherInstance',
 			orgMsg1	= {'ba': 'bo'},
@@ -289,5 +289,5 @@ describe('Send and receive', function() {
 		});
 
 	});
-
+*/
 });

@@ -27,6 +27,7 @@ function Intercom(conStr) {
 	that.channelName	= 1;
 	that.host	= parsedConStr.hostname;
 	that.port	= parsedConStr.port || 5672;
+	that.declaredExchanges	= [];
 
 	that.socket = net.connect({
 		'port': that.port,
@@ -242,6 +243,13 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 
 	log.verbose('larvitamintercom: declareExchange() - exchangeName: "' + exchangeName + '"');
 
+	if (that.declaredExchanges.indexOf(exchangeName) !== - 1) {
+		log.debug('larvitamintercom: declareExchange() - Exchange allready declared! exchangeName: "' + exchangeName + '"');
+		cb();
+	}
+
+	console.log('declaring whaaat?: ' + exchangeName);
+
 	that.handle.exchange.declare(
 		that.channelName,
 		exchangeName,
@@ -259,6 +267,7 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 
 			log.debug('larvitamintercom: declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
 
+			that.declaredExchanges.push(exchangeName);
 			cb(err);
 		}
 	);
