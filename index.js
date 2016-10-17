@@ -509,6 +509,7 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 
 				try {
 					message = JSON.parse(content.toString());
+					log.debug('larvitamintercom: subscribe() - Incoming message parsed, deliveryTag: "' + deliveryTag + '" message: "' + content.toString() + '"');
 				} catch(err) {
 					log.warn('larvitamintercom: subscribe() - Could not parse incoming message. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
 					cb(err);
