@@ -83,7 +83,6 @@ after(function(done) {
 });
 
 describe('Send and receive', function() {
-/**/
 	it('check so the first intercom is up', function(done) {
 		const	intercom	= intercoms[0];
 
@@ -289,7 +288,53 @@ describe('Send and receive', function() {
 				});
 			}
 		});
-
 	});
 
+	it('send and receive messages on different exchanges', function(done) {
+		const	exchangeName1	= 'differentExes1',
+			exchangeName2	= 'differentExes2',
+			orgMsg1	= {'bar': 'bor'},
+			orgMsg2	= {'waffer': 'woffer'},
+			tasks	= [];
+
+		let	receivedMsg1	= 0,
+			receivedMsg2	= 0;
+
+		tasks.push(function(cb) {
+			intercoms[13].subscribe({'exchange': exchangeName1}, function(msg, ack) {
+				assert.deepEqual(msg.bar, orgMsg1.bar);
+				receivedMsg1 ++;
+				ack();
+			}, cb);
+		});
+
+		tasks.push(function(cb) {
+			intercoms[13].subscribe({'exchange': exchangeName2}, function(msg, ack) {
+				assert.deepEqual(msg.waffer, orgMsg2.waffer);
+				receivedMsg2 ++;
+				ack();
+			}, cb);
+		});
+
+		tasks.push(function(cb) {
+			intercoms[13].send(orgMsg1, {'exchange': exchangeName1}, cb);
+		});
+
+		tasks.push(function(cb) {
+			intercoms[13].send(orgMsg2, {'exchange': exchangeName2}, cb);
+		});
+
+		async.series(tasks, function(err) {
+			let	interval;
+
+			if (err) throw err;
+
+			interval = setInterval(function() {
+				if (receivedMsg1 === 1 && receivedMsg2 === 1) {
+					clearInterval(interval);
+					done();
+				}
+			}, 10);
+		});
+	});
 });
