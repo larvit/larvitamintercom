@@ -28,11 +28,9 @@ function Intercom(conStr) {
 	that.host	= parsedConStr.hostname;
 	that.port	= parsedConStr.port || 5672;
 	that.declaredExchanges	= [];
-	that.sendQueue	= [];
-	that.sendInProgress	= false;
 
 	that.socket = net.connect({
-		'port': that.port,
+		'port':	that.port,
 		'host':	that.host
 	});
 
@@ -49,6 +47,7 @@ function Intercom(conStr) {
 			log.debug('larvitamintercom: Intercom() - bramqp.initialize() ran on ' + that.host + ':' + that.port);
 
 			that.handle = result;
+
 			cb(err);
 		});
 	});
@@ -78,6 +77,38 @@ function Intercom(conStr) {
 		});
 	});
 
+	// Register listener for incoming messages
+	tasks.push(function(cb) {
+		that.handle.on(that.channelName + ':basic.deliver', function(channel, method, data) {
+			const	exchange	= data.exchange,
+				deliveryTag	= data['delivery-tag'],
+				consumerTag	= data['consumer-tag'];
+
+			log.debug('larvitamintercom: Intercom() - Incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '"');
+
+			that.handle.once('content', function(channel, className, properties, content) {
+				let	message;
+
+				log.debug('larvitamintercom: Intercom() - Incoming message content. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+
+				try {
+					message = JSON.parse(content.toString());
+				} catch(err) {
+					log.warn('larvitamintercom: subscribe() - Could not parse incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+					cb(err);
+					return;
+				}
+
+				if (lUtils.formatUuid(message.uuid) === false) {
+					log.warn('larvitamintercom: consume() - Message does not contain uuid. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+				}
+
+				that.emit('incoming_msg_' + exchange, message, deliveryTag);
+			});
+		});
+		cb();
+	});
+
 	async.series(tasks, function(err) {
 		if ( ! err) {
 			log.debug('larvitamintercom: Intercom() - Initialized on ' + that.host + ':' + that.port);
@@ -89,7 +120,7 @@ function Intercom(conStr) {
 // Make Intercom an event emitter
 Intercom.prototype.__proto__ = EventEmitter.prototype;
 
-Intercom.prototype.bindQueue = function(queueName, exchangeName, cb) {
+Intercom.prototype.bindQueue = function(queueName, exchange, cb) {
 	const	noWait	= false,	// "If set, the server will not respond to the method. The client
 				// should not wait for a reply method. If the server could not complete
 				// the method it will raise a channel or connection exception."
@@ -97,14 +128,14 @@ Intercom.prototype.bindQueue = function(queueName, exchangeName, cb) {
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
 		that	= this;
 
-	log.verbose('larvitamintercom: bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchangeName + '"');
+	log.verbose('larvitamintercom: bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
-	that.handle.queue.bind(that.channelName, queueName, exchangeName, 'ignored-routing-key', noWait, args, function(err) {
+	that.handle.queue.bind(that.channelName, queueName, exchange, 'ignored-routing-key', noWait, args, function(err) {
 		if (err) {
-			log.error('larvitamintercom: bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchangeName + '", err: ' + err.message);
+			log.error('larvitamintercom: bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchange + '", err: ' + err.message);
 		}
 
-		log.debug('larvitamintercom: bindQueue() - Bound queue "' + queueName + '" to exchange "' + exchangeName + '"');
+		log.debug('larvitamintercom: bindQueue() - Bound queue "' + queueName + '" to exchange "' + exchange + '"');
 
 		cb(err);
 	});
@@ -193,36 +224,25 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 
 	// Register msgCb
 	tasks.push(function(cb) {
-		that.handle.on(that.channelName + ':basic.deliver', function(channel, method, data) {
-			const	deliveryTag	= data['delivery-tag'];
+		const	eventName	= 'incoming_msg_' + options.exchange;
 
-			log.debug('larvitamintercom: consume() - Incoming message, deliveryTag: "' + deliveryTag + '"');
+		if (that.listenerCount(eventName) !== 0) {
+			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
+			log.warn('larvitamintercom: consume() - ' + err.message);
+			cb(err);
+			return;
+		}
 
-			that.handle.once('content', function(channel, className, properties, content) {
-				let	message;
-
-				try {
-					message = JSON.parse(content.toString());
-				} catch(err) {
-					log.warn('larvitamintercom: consume() - Could not parse incoming message. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
-					cb(err);
-					return;
+		that.on(eventName, function(message, deliveryTag) {
+			msgCb(message, function(err) {
+				if (err) {
+					log.warn('larvitamintercom: consume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
+					that.handle.basic.nack(that.channelName, deliveryTag);
+				} else {
+					log.debug('larvitamintercom: consume() - ack on deliveryTag: "' + deliveryTag + '"');
+					that.handle.basic.ack(that.channelName, deliveryTag);
 				}
-
-				if (lUtils.formatUuid(message.uuid) === false) {
-					log.warn('larvitamintercom: consume() - Message does not contain uuid. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
-				}
-
-				msgCb(message, function(err) {
-					if (err) {
-						log.warn('larvitamintercom: consume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
-						that.handle.basic.nack(that.channelName, deliveryTag);
-					} else {
-						log.debug('larvitamintercom: consume() - ack on deliveryTag: "' + deliveryTag + '"');
-						that.handle.basic.ack(that.channelName, deliveryTag);
-					}
-				}, deliveryTag);
-			});
+			}, deliveryTag);
 		});
 
 		cb();
@@ -243,14 +263,15 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.arguments
 		that	= this;
 
-	log.verbose('larvitamintercom: declareExchange() - exchangeName: "' + exchangeName + '"');
+	log.debug('larvitamintercom: declareExchange() - exchangeName: "' + exchangeName + '"');
 
 	if (that.declaredExchanges.indexOf(exchangeName) !== - 1) {
-		log.debug('larvitamintercom: declareExchange() - Exchange already declared! exchangeName: "' + exchangeName + '"');
-
+		log.debug('larvitamintercom: declareExchange() - Already declared. exchangeName: "' + exchangeName + '"');
 		cb();
 		return;
 	}
+
+	log.verbose('larvitamintercom: declareExchange() - Declaring exchangeName: "' + exchangeName + '"');
 
 	that.handle.exchange.declare(
 		that.channelName,
@@ -265,11 +286,12 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 		function(err) {
 			if (err) {
 				log.warn('larvitamintercom: declareExchange() - Could not declare exchange "' + exchangeName + '", err: ' + err.message);
+			} else {
+				that.declaredExchanges.push(exchangeName);
 			}
 
 			log.debug('larvitamintercom: declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
 
-			that.declaredExchanges.push(exchangeName);
 			cb(err);
 		}
 	);
@@ -329,7 +351,11 @@ Intercom.prototype.declareQueue = function(options, cb) {
  * @param func cb(err, message assigned uuid)
  */
 Intercom.prototype.send = function(orgMsg, options, cb) {
-	const	that	= this;
+	const	message	= require('util')._extend({}, orgMsg),
+		tasks	= [],
+		that	= this;
+
+	let	stringifiedMsg;
 
 	if (typeof options === 'function') {
 		cb	= options;
@@ -342,96 +368,70 @@ Intercom.prototype.send = function(orgMsg, options, cb) {
 
 	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
 
-	that.sendQueue.push({'orgMsg': orgMsg, 'options': options, 'cb': cb});
+	try {
+		if (message.uuid === undefined) {
+			message.uuid = uuidLib.v4();
+		}
 
-	if (that.sendInProgress === true) {
+		stringifiedMsg = JSON.stringify(message);
+	} catch(err) {
+		log.warn('larvitamintercom: send() - Could not stringify message. Message attached to next log call.');
+		log.warn('larvitamintercom: send() - Unstringifiable message attached:', message);
+		cb(err);
 		return;
 	}
 
-	that.sendInProgress = true;
+	log.debug('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
-	function readFromQueue() {
-		const	params	= that.sendQueue.shift(),
-			orgMsg	= params.orgMsg,
-			options	= params.options,
-			cb	= params.cb,
-			message	= require('util')._extend({}, orgMsg),
-			tasks	= [];
+	// Declare exchange
+	tasks.push(function(cb) {
+		that.declareExchange(options.exchange, cb);
+	});
 
-		let	stringifiedMsg;
+	// Publish
+	tasks.push(function(cb) {
+		const	mandatory	= true,
+			immediate	= false;
 
-		try {
-			if (message.uuid === undefined) {
-				message.uuid = uuidLib.v4();
-			}
-
-			stringifiedMsg = JSON.stringify(message);
-		} catch(err) {
-			log.warn('larvitamintercom: send() - Could not stringify message. Message attached to next log call.');
-			log.warn('larvitamintercom: send() - Unstringifiable message attached:', message);
-			cb(err);
-			return;
-		}
-
-		log.debug('larvitamintercom: send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
-
-		// Declare exchange
-		tasks.push(function(cb) {
-			that.declareExchange(options.exchange, cb);
-		});
-
-		// Publish
-		tasks.push(function(cb) {
-			const	mandatory	= true,
-				immediate	= false;
-
-			that.handle.basic.publish(
-				that.channelName,
-				options.exchange,
-				'ignored-routing-key',
-				mandatory,
-				immediate,
-				function(err) {
-					if (err) {
-						log.warn('larvitamintercom: send() - readFromQueue() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
-						cb(err);
-						return;
-					}
-
-					log.debug('larvitamintercom: send() - readFromQueue() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
-
-					cb();
-				}
-			);
-		});
-
-		// Send content
-		tasks.push(function(cb) {
-			const	properties	= {'content-type': 'application/json'},
-				className	= 'basic';
-
-			that.handle.content(that.channelName, className, properties, stringifiedMsg, function(err) {
+		that.handle.basic.publish(
+			that.channelName,
+			options.exchange,
+			'ignored-routing-key',
+			mandatory,
+			immediate,
+			function(err) {
 				if (err) {
-					log.warn('larvitamintercom: send() - readFromQueue() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+					log.warn('larvitamintercom: send() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+					cb(err);
+					return;
 				}
 
-				log.debug('larvitamintercom: send() - readFromQueue() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+				log.debug('larvitamintercom: send() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
-				cb(err);
-			});
-		});
-
-		async.series(tasks, function(err) {
-			cb(err, message.uuid);
-
-			if (that.sendQueue.length === 0) {
-				that.sendInProgress = false;
-			} else {
-				readFromQueue();
+				cb();
 			}
+		);
+	});
+
+	// Send content
+	tasks.push(function(cb) {
+		const	properties	= {'content-type': 'application/json'},
+			className	= 'basic';
+
+		that.handle.content(that.channelName, className, properties, stringifiedMsg, function(err) {
+			if (err) {
+				log.warn('larvitamintercom: send() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+			}
+
+			log.debug('larvitamintercom: send() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+
+			cb(err);
 		});
-	}
-	readFromQueue();
+	});
+
+	async.series(tasks, function(err) {
+		cb(err, message.uuid);
+	});
 };
 
 Intercom.prototype.subscribe = function(options, msgCb, cb) {
@@ -492,44 +492,32 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 
 		that.handle.basic.consume(that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args);
 		that.handle.once(that.channelName + ':basic.consume-ok', function(channel, method, data) {
-			log.verbose('larvitamintercom: subscribe() - Started consuming with consumer tag: "' + data['consumer-tag'] + '"');
+			log.verbose('larvitamintercom: subscribe() - Started consuming with consumer tag: "' + data['consumer-tag'] + '", queueName: "' + queueName + '"');
 			cb();
 		});
 	});
 
 	// Register msgCb
 	tasks.push(function(cb) {
-		that.handle.on(that.channelName + ':basic.deliver', function(channel, method, data) {
-			const	deliveryTag	= data['delivery-tag'];
+		const	eventName	= 'incoming_msg_' + options.exchange;
 
-			log.debug('larvitamintercom: subscribe() - Incoming message, deliveryTag: "' + deliveryTag + '"');
+		if (that.listenerCount(eventName) !== 0) {
+			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
+			log.warn('larvitamintercom: subscribe() - ' + err.message);
+			cb(err);
+			return;
+		}
 
-			that.handle.once('content', function(channel, className, properties, content) {
-				let	message;
-
-				try {
-					message = JSON.parse(content.toString());
-					log.debug('larvitamintercom: subscribe() - Incoming message parsed, deliveryTag: "' + deliveryTag + '" message: "' + content.toString() + '"');
-				} catch(err) {
-					log.warn('larvitamintercom: subscribe() - Could not parse incoming message. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
-					cb(err);
-					return;
+		that.on(eventName, function(message, deliveryTag) {
+			msgCb(message, function(err) {
+				if (err) {
+					log.warn('larvitamintercom: subscribe() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
+					that.handle.basic.nack(that.channelName, deliveryTag);
+				} else {
+					log.debug('larvitamintercom: subscribe() - ack on deliveryTag: "' + deliveryTag + '"');
+					that.handle.basic.ack(that.channelName, deliveryTag);
 				}
-
-				if (lUtils.formatUuid(message.uuid) === false) {
-					log.warn('larvitamintercom: consume() - Message does not contain uuid. deliveryTag: "' + deliveryTag + '" content: "' + content.toString() + '"');
-				}
-
-				msgCb(message, function(err) {
-					if (err) {
-						log.warn('larvitamintercom: subscribe() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
-						that.handle.basic.nack(that.channelName, deliveryTag);
-					} else {
-						log.debug('larvitamintercom: subscribe() - ack on deliveryTag: "' + deliveryTag + '"');
-						that.handle.basic.ack(that.channelName, deliveryTag);
-					}
-				}, deliveryTag);
-			});
+			}, deliveryTag);
 		});
 
 		cb();
