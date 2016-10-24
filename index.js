@@ -28,9 +28,11 @@ function Intercom(conStr) {
 	that.host	= parsedConStr.hostname;
 	that.port	= parsedConStr.port || 5672;
 	that.declaredExchanges	= [];
+	that.sendQueue	= [];
+	that.sendInProgress	= false;
 
 	that.socket = net.connect({
-		'port':	that.port,
+		'port': that.port,
 		'host':	that.host
 	});
 
@@ -292,6 +294,7 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 
 			log.debug('larvitamintercom: declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
 
+			that.declaredExchanges.push(exchangeName);
 			cb(err);
 		}
 	);
@@ -351,11 +354,7 @@ Intercom.prototype.declareQueue = function(options, cb) {
  * @param func cb(err, message assigned uuid)
  */
 Intercom.prototype.send = function(orgMsg, options, cb) {
-	const	message	= require('util')._extend({}, orgMsg),
-		tasks	= [],
-		that	= this;
-
-	let	stringifiedMsg;
+	const	that	= this;
 
 	if (typeof options === 'function') {
 		cb	= options;
@@ -368,70 +367,96 @@ Intercom.prototype.send = function(orgMsg, options, cb) {
 
 	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
 
-	try {
-		if (message.uuid === undefined) {
-			message.uuid = uuidLib.v4();
-		}
+	that.sendQueue.push({'orgMsg': orgMsg, 'options': options, 'cb': cb});
 
-		stringifiedMsg = JSON.stringify(message);
-	} catch(err) {
-		log.warn('larvitamintercom: send() - Could not stringify message. Message attached to next log call.');
-		log.warn('larvitamintercom: send() - Unstringifiable message attached:', message);
-		cb(err);
+	if (that.sendInProgress === true) {
 		return;
 	}
 
-	log.debug('larvitamintercom: send() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+	that.sendInProgress = true;
 
-	// Declare exchange
-	tasks.push(function(cb) {
-		that.declareExchange(options.exchange, cb);
-	});
+	function readFromQueue() {
+		const	params	= that.sendQueue.shift(),
+			orgMsg	= params.orgMsg,
+			options	= params.options,
+			cb	= params.cb,
+			message	= require('util')._extend({}, orgMsg),
+			tasks	= [];
 
-	// Publish
-	tasks.push(function(cb) {
-		const	mandatory	= true,
-			immediate	= false;
+		let	stringifiedMsg;
 
-		that.handle.basic.publish(
-			that.channelName,
-			options.exchange,
-			'ignored-routing-key',
-			mandatory,
-			immediate,
-			function(err) {
+		try {
+			if (message.uuid === undefined) {
+				message.uuid = uuidLib.v4();
+			}
+
+			stringifiedMsg = JSON.stringify(message);
+		} catch(err) {
+			log.warn('larvitamintercom: send() - Could not stringify message. Message attached to next log call.');
+			log.warn('larvitamintercom: send() - Unstringifiable message attached:', message);
+			cb(err);
+			return;
+		}
+
+		log.debug('larvitamintercom: send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+
+		// Declare exchange
+		tasks.push(function(cb) {
+			that.declareExchange(options.exchange, cb);
+		});
+
+		// Publish
+		tasks.push(function(cb) {
+			const	mandatory	= true,
+				immediate	= false;
+
+			that.handle.basic.publish(
+				that.channelName,
+				options.exchange,
+				'ignored-routing-key',
+				mandatory,
+				immediate,
+				function(err) {
+					if (err) {
+						log.warn('larvitamintercom: send() - readFromQueue() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+						cb(err);
+						return;
+					}
+
+					log.debug('larvitamintercom: send() - readFromQueue() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+
+					cb();
+				}
+			);
+		});
+
+		// Send content
+		tasks.push(function(cb) {
+			const	properties	= {'content-type': 'application/json'},
+				className	= 'basic';
+
+			that.handle.content(that.channelName, className, properties, stringifiedMsg, function(err) {
 				if (err) {
-					log.warn('larvitamintercom: send() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
-					cb(err);
-					return;
+					log.warn('larvitamintercom: send() - readFromQueue() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 				}
 
-				log.debug('larvitamintercom: send() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+				log.debug('larvitamintercom: send() - readFromQueue() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
-				cb();
-			}
-		);
-	});
-
-	// Send content
-	tasks.push(function(cb) {
-		const	properties	= {'content-type': 'application/json'},
-			className	= 'basic';
-
-		that.handle.content(that.channelName, className, properties, stringifiedMsg, function(err) {
-			if (err) {
-				log.warn('larvitamintercom: send() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
-			}
-
-			log.debug('larvitamintercom: send() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
-
-			cb(err);
+				cb(err);
+			});
 		});
-	});
 
-	async.series(tasks, function(err) {
-		cb(err, message.uuid);
-	});
+		async.series(tasks, function(err) {
+			cb(err, message.uuid);
+
+			if (that.sendQueue.length === 0) {
+				that.sendInProgress = false;
+			} else {
+				readFromQueue();
+			}
+		});
+	}
+	readFromQueue();
 };
 
 Intercom.prototype.subscribe = function(options, msgCb, cb) {
