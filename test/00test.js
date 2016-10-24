@@ -15,7 +15,7 @@ log.remove(log.transports.Console);
 /**/log.add(log.transports.Console, {
 	'colorize':	true,
 	'timestamp':	true,
-	'level':	'debug',
+	'level':	'warn',
 	'json':	false
 });
 /**/
