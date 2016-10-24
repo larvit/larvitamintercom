@@ -300,7 +300,7 @@ describe('Send and receive', function() {
 
 		tasks.push(function(cb) {
 			intercoms[0].subscribe({'exchange': exchange1}, function(msg, ack) {
-				//assert.deepEqual(msg.bar, orgMsg1.bar);
+				assert.deepEqual(msg.bar, orgMsg1.bar);
 				receivedMsg1 ++;
 				ack();
 			}, cb);
@@ -308,7 +308,7 @@ describe('Send and receive', function() {
 
 		tasks.push(function(cb) {
 			intercoms[0].subscribe({'exchange': exchange2}, function(msg, ack) {
-				//assert.deepEqual(msg.waffer, orgMsg2.waffer);
+				assert.deepEqual(msg.waffer, orgMsg2.waffer);
 				receivedMsg2 ++;
 				ack();
 			}, cb);
