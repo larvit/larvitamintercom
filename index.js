@@ -1,7 +1,7 @@
 'use strict';
 
 const	EventEmitter	= require('events').EventEmitter,
-	uuidLib	= require('node-uuid'),
+	uuidLib	= require('uuid'),
 	bramqp	= require('bramqp'),
 	lUtils	= require('larvitutils'),
 	async	= require('async'),
