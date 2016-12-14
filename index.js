@@ -1,6 +1,7 @@
 'use strict';
 
 const	EventEmitter	= require('events').EventEmitter,
+	DumpDetails	= require(__dirname + '/dumpDetails.js'),
 	uuidLib	= require('uuid'),
 	bramqp	= require('bramqp'),
 	lUtils	= require('larvitutils'),
@@ -30,6 +31,7 @@ function Intercom(conStr) {
 	that.declaredExchanges	= [];
 	that.sendQueue	= [];
 	that.sendInProgress	= false;
+	that.dumpDetails	= new DumpDetails();
 
 	that.socket = net.connect({
 		'port': that.port,
@@ -180,7 +182,14 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 		cb = function() {};
 	}
 
-	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
+	if (options.exchange === undefined) {
+		options.exchange	= 'default';
+	} else if (options.exchange === 'dumpDetails' && options.dumpDetails !== true) {
+		const err = new Error('Exchange name "dumpDetails" is not allowed');
+		log.warn('larvitamintercom: consume() - ' + err.message);
+		cb(err);
+		return;
+	}
 
 	queueName	= 'queTo_' + options.exchange;
 
@@ -321,7 +330,7 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 Intercom.prototype.declareQueue = function(options, cb) {
 	const	autoDelete	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.auto-delete
 		passive	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.passive
-		durable	= true,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.durable
+		durable	= (options.durable === undefined) ? true : options.durable,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.durable
 		noWait	= false,	//  "If set, the server will not respond to the method. The client should not
 				// wait for a reply method. If the server could not complete the method it will
 				// raise a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
@@ -349,8 +358,13 @@ Intercom.prototype.declareQueue = function(options, cb) {
 /**
  * Send something
  *
- * @param obj message - message will be appended with an uuid if that does not exist
- * @param obj options - OPTIONAL - options.exchange = str
+ * @param obj message	- message will be appended with an uuid if that does not exist
+ * @param obj options	- { OPTIONAL
+ *			'exchange':	str,	// Default: "default"
+ *			'durable':	boolean,	// Default: true
+ *			'forceConsumeQueue':	boolean,	// Default: false - will create a consume-queue even if there currently are no listeners
+ *			'dumpDetails':	boolean	// Only to be used internally to allow exchangeName === 'dumpDetails'
+ *		}
  * @param func cb(err, message assigned uuid)
  */
 Intercom.prototype.send = function(orgMsg, options, cb) {
@@ -365,7 +379,14 @@ Intercom.prototype.send = function(orgMsg, options, cb) {
 		cb = function() {};
 	}
 
-	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
+	if (options.exchange === undefined) {
+		options.exchange	= 'default';
+	} else if (options.exchange === 'dumpDetails' && options.dumpDetails !== true) {
+		const err = new Error('Exchange name "dumpDetails" is not allowed');
+		log.warn('larvitamintercom: send() - ' + err.message);
+		cb(err);
+		return;
+	}
 
 	that.sendQueue.push({'orgMsg': orgMsg, 'options': options, 'cb': cb});
 
@@ -475,9 +496,16 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 		cb = function() {};
 	}
 
-	if (options.exchange	=== undefined) {	options.exchange	= 'default';	}
+	if (options.exchange === undefined) {
+		options.exchange	= 'default';
+	} else if (options.exchange === 'dumpDetails' && options.dumpDetails !== true) {
+		const err = new Error('Exchange name "dumpDetails" is not allowed');
+		log.warn('larvitamintercom: subscribe() - ' + err.message);
+		cb(err);
+		return;
+	}
 
-	log.verbose('larvitamintercom: consume() - Starting on exchange "' + options.exchange + '"');
+	log.verbose('larvitamintercom: subscribe() - Starting on exchange "' + options.exchange + '"');
 
 	// Declare exchange
 	tasks.push(function(cb) {

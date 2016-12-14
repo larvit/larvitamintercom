@@ -335,4 +335,136 @@ describe('Send and receive', function() {
 			}, 10);
 		});
 	});
+
+	it('send before consumer is up and still receive', function(done) {
+		const	exchange	= 'dkfia893M', // Random exchange to not collide with another test
+			orgMsg	= {'foo': 'bar'};
+
+		this.timeout(500);
+		this.slow(420); // > 1050 is shown in yellow, 1000ms is setTimeout()
+
+		intercoms[0].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function(err) {
+			if (err) throw err;
+
+			setTimeout(function() {
+				intercoms[0].consume({'exchange': exchange}, function(msg, ack, deliveryTag) {
+					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+					delete msg.uuid;
+					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+					assert(deliveryTag, 'deliveryTag shoult be non-empty');
+					ack();
+					done();
+				}, function(err) {
+					if (err) throw err;
+
+				});
+			}, 200);
+		});
+	});
 });
+
+/*
+describe('Send and receive data dump details', function() {
+	it('set up single sender and receiver', function(done) {
+		const	sendDumpDetails	= {},
+			dataSection	= 'foobar';
+
+		sendDumpDetails.host	= 'https://foo.larvit.se/getDump';
+		sendDumpDetails.username	= 'ghost';
+		sendDumpDetails.password	= 'secret';
+
+		intercoms[0].dumpDetails.on(dataSection, function(cb) {
+			cb(null, sendDumpDetails, function(err) {
+				if (err) throw err;
+			});
+		});
+
+		intercoms[1].dumpDetails.get(dataSection, function(err, dumpDetails) {
+			if (err) throw err;
+
+			for (const key of Object.keys(sendDumpDetails))
+				assert.deepEqual(sendDumpDetails[key], dumpDetails[key]);
+
+			done();
+		});
+	});
+
+	it('set up single sender and two receivers with different data sections', function(done) {
+		const	sendDumpDetails	= {},
+			dataSection1	= 'foobar',
+			dataSection2	= 'nopes';
+
+		sendDumpDetails.host	= 'https://foo.larvit.se/getDump';
+		sendDumpDetails.username	= 'ghost';
+		sendDumpDetails.password	= 'secret';
+
+		// Make sure no other code is running for our tests
+		intercoms[0].dumpDetails.removeAllListeners();
+
+		intercoms[0].dumpDetails.on(dataSection1, function(cb) {
+			cb(null, sendDumpDetails, function(err) {
+				if (err) throw err;
+			});
+		});
+
+		setTimeout(function() {
+			intercoms[2].dumpDetails.get(dataSection1, function(err, dumpDetails) {
+				if (err) throw err;
+
+				for (const key of Object.keys(sendDumpDetails))
+					assert.deepEqual(sendDumpDetails[key], dumpDetails[key]);
+
+				done();
+			});
+		}, 500);
+
+		intercoms[1].dumpDetails.get(dataSection2, function() {
+			throw new Error('This should never be ran');
+		});
+	});
+
+	it('should never send two dump details when asked once', function(done) {
+		const	sendDumpDetails	= {},
+			dataSection	= 'foobar';
+
+		let	sendRan	= false,
+			getRan	= false;
+
+		sendDumpDetails.host	= 'https://foo.larvit.se/getDump';
+		sendDumpDetails.username	= 'ghost';
+		sendDumpDetails.password	= 'secret';
+
+		// Make sure no other code is running for our tests
+		intercoms[0].dumpDetails.removeAllListeners();
+		intercoms[1].dumpDetails.removeAllListeners();
+
+		intercoms[0].dumpDetails.on(dataSection, function(cb) {
+			assert.deepEqual(sendRan, false);
+			sendRan = true;
+			cb(null, sendDumpDetails, function(err) {
+				if (err) throw err;
+			});
+		});
+
+		intercoms[1].dumpDetails.on(dataSection, function(cb) {
+			assert.deepEqual(sendRan, false);
+			sendRan = true;
+			cb(null, sendDumpDetails, function(err) {
+				if (err) throw err;
+			});
+		});
+
+		intercoms[2].getDumpDetails(dataSection, function(err, dumpDetails) {
+			assert.deepEqual(getRan, false);
+			getRan = true;
+			if (err) throw err;
+
+			for (const key of Object.keys(sendDumpDetails))
+				assert.deepEqual(sendDumpDetails[key], dumpDetails[key]);
+
+			// Wait a little while to make sure things does not happend twice
+			setTimeout(done, 200);
+		});
+	});
+});
+*/

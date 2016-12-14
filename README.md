@@ -29,7 +29,8 @@ intercom.send(message, options, function(err, msgUuid) {
 ```javascript
 {
 	'exchange':	'default',
-	'durable':	true
+	'durable':	true,
+	'forceConsumeQueue':	false // Will create a queue for consumtion even if there is no current listeners. This way no message will ever be lost, since they will wait in this queue until some consumer consumes them.
 }
 ```
 
@@ -121,7 +122,7 @@ const	dataSection	= 'foobar',
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-intercom.getDumpDetails(dataSection, function(err, dumpDetails) {
+intercom.dumpDetails.get(dataSection, function(err, dumpDetails) {
 	if (err) throw err;
 
 	// dumpDetails is a direct response from another minion that sees itself as responsible for data in the selected dataSection
@@ -138,13 +139,17 @@ const	dataSection	= 'foobar',
 	intercom	= new Intercom(conStr);
 
 // This will be called each time some other minion asks for dump details
-intercom.sendDumpDetails(dataSection, function(cb) {
+// If multiple minions is sending to the same dataSection, the first to answer the call gets it
+intercom.dumpDetails.on(dataSection, function(cb) {
 	const dumpDetails = {
 		'host':	'https://foo.larvit.se/getDump',
 		'username':	'ghost',
 		'password':	'secret'
 	};
 
-	cb(null, dumpDetails);
+	cb(null, dumpDetails, function(err) {
+		if (err) throw err;
+		// This callback will be called when the details are sent to the queue
+	});
 });
 ```
