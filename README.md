@@ -108,3 +108,43 @@ intercom.subscribe(options, function(message, ack, deliveryTag) {
 	'exchange':	'default'
 }
 ```
+
+### Sync between minions
+
+In a clustered application environment it is important to be able to syncronize data. larvitamintercom helps with this by returning an http link to where this dump resides upon request.
+
+#### Require a sync
+
+```javascript
+const	dataSection	= 'foobar',
+	Intercom	= require('larvitamintercom').Intercom,
+	conStr	= 'amqp://user:password@192.168.0.1/',
+	intercom	= new Intercom(conStr);
+
+intercom.getDumpDetails(dataSection, function(err, dumpDetails) {
+	if (err) throw err;
+
+	// dumpDetails is a direct response from another minion that sees itself as responsible for data in the selected dataSection
+	// For example it could include details about a http link where the data exists, it could be the dump itself (if it is small) or something else
+});
+```
+
+#### Respond to a sync request
+
+```javascript
+const	dataSection	= 'foobar',
+	Intercom	= require('larvitamintercom').Intercom,
+	conStr	= 'amqp://user:password@192.168.0.1/',
+	intercom	= new Intercom(conStr);
+
+// This will be called each time some other minion asks for dump details
+intercom.sendDumpDetails(dataSection, function(cb) {
+	const dumpDetails = {
+		'host':	'https://foo.larvit.se/getDump',
+		'username':	'ghost',
+		'password':	'secret'
+	};
+
+	cb(null, dumpDetails);
+});
+```
