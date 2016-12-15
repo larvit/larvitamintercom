@@ -340,7 +340,7 @@ Intercom.prototype.declareQueue = function(options, cb) {
 	if ( ! options.queueName)	{ options.queueName	= '';	}
 	if (options.exclusive === undefined)	{ options.exclusive	= false;	}
 
-	log.verbose('larvitamintercom: declareQueue() - Declaring. queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
+	log.verbose('larvitamintercom: declareQueue() - Declaring queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
 
 	that.handle.queue.declare(that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args, function(err) {
 		if (err) {
@@ -425,6 +425,20 @@ Intercom.prototype.send = function(orgMsg, options, cb) {
 		tasks.push(function(cb) {
 			that.declareExchange(options.exchange, cb);
 		});
+
+		if (options.forceConsumeQueue === true) {
+			const	queueName	= 'queTo_' + options.exchange;
+
+			// Declare queue
+			tasks.push(function(cb) {
+				that.declareQueue({'queueName': queueName}, cb);
+			});
+
+			// Bind queue
+			tasks.push(function(cb) {
+				that.bindQueue(queueName, options.exchange, cb);
+			});
+		}
 
 		// Publish
 		tasks.push(function(cb) {
