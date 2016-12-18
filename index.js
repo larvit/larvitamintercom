@@ -1,7 +1,6 @@
 'use strict';
 
 const	EventEmitter	= require('events').EventEmitter,
-	DumpDetails	= require(__dirname + '/dumpDetails.js'),
 	uuidLib	= require('uuid'),
 	bramqp	= require('bramqp'),
 	lUtils	= require('larvitutils'),
@@ -31,7 +30,6 @@ function Intercom(conStr) {
 	that.declaredExchanges	= [];
 	that.sendQueue	= [];
 	that.sendInProgress	= false;
-	that.dumpDetails	= new DumpDetails();
 
 	that.socket = net.connect({
 		'port': that.port,
@@ -184,11 +182,6 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 
 	if (options.exchange === undefined) {
 		options.exchange	= 'default';
-	} else if (options.exchange === 'dumpDetails' && options.dumpDetails !== true) {
-		const err = new Error('Exchange name "dumpDetails" is not allowed');
-		log.warn('larvitamintercom: consume() - ' + err.message);
-		cb(err);
-		return;
 	}
 
 	queueName	= 'queTo_' + options.exchange;
@@ -363,7 +356,6 @@ Intercom.prototype.declareQueue = function(options, cb) {
  *			'exchange':	str,	// Default: "default"
  *			'durable':	boolean,	// Default: true
  *			'forceConsumeQueue':	boolean,	// Default: false - will create a consume-queue even if there currently are no listeners
- *			'dumpDetails':	boolean	// Only to be used internally to allow exchangeName === 'dumpDetails'
  *		}
  * @param func cb(err, message assigned uuid)
  */
@@ -381,11 +373,6 @@ Intercom.prototype.send = function(orgMsg, options, cb) {
 
 	if (options.exchange === undefined) {
 		options.exchange	= 'default';
-	} else if (options.exchange === 'dumpDetails' && options.dumpDetails !== true) {
-		const err = new Error('Exchange name "dumpDetails" is not allowed');
-		log.warn('larvitamintercom: send() - ' + err.message);
-		cb(err);
-		return;
 	}
 
 	that.sendQueue.push({'orgMsg': orgMsg, 'options': options, 'cb': cb});
@@ -512,11 +499,6 @@ Intercom.prototype.subscribe = function(options, msgCb, cb) {
 
 	if (options.exchange === undefined) {
 		options.exchange	= 'default';
-	} else if (options.exchange === 'dumpDetails' && options.dumpDetails !== true) {
-		const err = new Error('Exchange name "dumpDetails" is not allowed');
-		log.warn('larvitamintercom: subscribe() - ' + err.message);
-		cb(err);
-		return;
 	}
 
 	log.verbose('larvitamintercom: subscribe() - Starting on exchange "' + options.exchange + '"');
