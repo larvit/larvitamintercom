@@ -30,6 +30,7 @@ function Intercom(conStr) {
 	that.declaredExchanges	= [];
 	that.sendQueue	= [];
 	that.sendInProgress	= false;
+	that.queueReady	= false;
 
 	that.socket = net.connect({
 		'port': that.port,
@@ -114,6 +115,7 @@ function Intercom(conStr) {
 	async.series(tasks, function(err) {
 		if ( ! err) {
 			log.debug('larvitamintercom: Intercom() - Initialized on ' + that.host + ':' + that.port);
+			that.queueReady	= true;
 			that.emit('ready');
 		}
 	});
@@ -132,6 +134,15 @@ Intercom.prototype.bindQueue = function(queueName, exchange, cb) {
 
 	log.verbose('larvitamintercom: bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
+	if (that.queueReady !== true) {
+		const	err	= new Error('queue is not ready, make sure the ready event is triggered before running this function');
+
+		log.error('larvitamintercom: bindQueue() - ' + err.message);
+		cb(err);
+
+		return;
+	}
+
 	that.handle.queue.bind(that.channelName, queueName, exchange, 'ignored-routing-key', noWait, args, function(err) {
 		if (err) {
 			log.error('larvitamintercom: bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchange + '", err: ' + err.message);
@@ -148,6 +159,15 @@ Intercom.prototype.close = function(cb) {
 	const	that = this;
 
 	log.verbose('larvitamintercom: close() - on ' + that.host + ':' + that.port);
+
+	if (that.queueReady !== true) {
+		const	err	= new Error('queue is not ready, make sure the ready event is triggered before running this function');
+
+		log.error('larvitamintercom: close() - ' + err.message);
+		cb(err);
+
+		return;
+	}
 
 	that.handle.closeAMQPCommunication(function(err) {
 		if (err) {
@@ -269,6 +289,15 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 
 	log.debug('larvitamintercom: declareExchange() - exchangeName: "' + exchangeName + '"');
 
+	if (that.queueReady !== true) {
+		const	err	= new Error('queue is not ready, make sure the ready event is triggered before running this function');
+
+		log.error('larvitamintercom: declareExchange() - ' + err.message);
+		cb(err);
+
+		return;
+	}
+
 	if (that.declaredExchanges.indexOf(exchangeName) !== - 1) {
 		log.debug('larvitamintercom: declareExchange() - Already declared. exchangeName: "' + exchangeName + '"');
 		cb();
@@ -334,6 +363,15 @@ Intercom.prototype.declareQueue = function(options, cb) {
 	if (options.exclusive === undefined)	{ options.exclusive	= false;	}
 
 	log.verbose('larvitamintercom: declareQueue() - Declaring queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
+
+	if (that.queueReady !== true) {
+		const	err	= new Error('queue is not ready, make sure the ready event is triggered before running this function');
+
+		log.error('larvitamintercom: declareQueue() - ' + err.message);
+		cb(err);
+
+		return;
+	}
 
 	that.handle.queue.declare(that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args, function(err) {
 		if (err) {
