@@ -204,6 +204,10 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 		options.exchange	= 'default';
 	}
 
+	if (options.exclusive !== true && options.exclusive !== false) {
+		options.exclusive = false;
+	}
+
 	queueName	= 'queTo_' + options.exchange;
 
 	log.verbose('larvitamintercom: consume() - Starting on exchange "' + options.exchange + '"');
@@ -236,7 +240,7 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 					// will succeed and immediately dequeues it. This functionality may increase performance
 					// but at the cost of reliability. Messages can get lost if a client dies before they
 					// are delivered to the application." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-			exclusive	= false,	// Request exclusive consumer access, meaning only this consumer can access the queue.
+			exclusive	= options.exclusive,	// Request exclusive consumer access, meaning only this consumer can access the queue.
 			args	= {};	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
 
 		that.handle.basic.consume(that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args);
