@@ -213,7 +213,7 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 
 	log.verbose('larvitamintercom: consume() - Starting on exchange "' + options.exchange + '"');
 
-	returnObj.end = function cancel(cb) {
+	returnObj.cancel = function cancel(cb) {
 		if (returnObj.data === undefined || returnObj.data['consumer-tag'] === undefined) {
 			const	err = new Error('No consumer tag is defined, consume have probably not been started yet.');
 			log.warn('larvitamintercom: consume() - ' + err.message);
