@@ -109,10 +109,10 @@ describe('Send and receive', function() {
 
 		function consume(intercom, cb) {
 			intercom.consume(function(msg, ack, deliveryTag) {
-				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
 				delete msg.uuid;
 				assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-				assert(deliveryTag, 'deliveryTag shoult be non-empty');
+				assert(deliveryTag, 'deliveryTag should be non-empty');
 				consumed ++;
 				ack();
 			}, cb);
@@ -120,10 +120,10 @@ describe('Send and receive', function() {
 
 		function subscribe(intercom, cb) {
 			intercom.subscribe(function(msg, ack, deliveryTag) {
-				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
 				delete msg.uuid;
 				assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-				assert(deliveryTag, 'deliveryTag shoult be non-empty');
+				assert(deliveryTag, 'deliveryTag should be non-empty');
 				subscribed ++;
 				ack();
 			}, cb);
