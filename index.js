@@ -317,6 +317,30 @@ Intercom.prototype.declareQueue = function(options, cb) {
 	});
 };
 
+/* Not working!
+Intercom.prototype.deleteQueue = function(queueName, cb) {
+	const	ifUnused	= false,	// If set, the server will only delete the queue if it
+				// has no consumers. If the queue has consumers the
+				// server does does not delete it but raises a channel
+				// exception instead.
+		ifEmpty	= false,	// If set, the server will only delete the queue if it
+				// has no messages.
+		noWait	= false;	// If set, the server will not respond to the method.
+				// The client should not wait for a reply method. If
+				// the server could not complete the method it will
+				// raise a channel or connection exception.
+
+	if (typeof cb !== 'function') {
+		cb = function() {};
+	}
+
+	that.handle.queue.delete(that.channelName, queueName, ifUnused, ifEmpty, noWait);
+	that.handle.once(that.channelName + ':queue.delete-ok', function(channel, method, data) {
+		log.verobse('larvitamintercom: deleteQueue() - queue "' + queueName + '", containing "' + data['message-count'] + '" deleted.');
+		cb();
+	});
+};*/
+
 Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 	const	returnObj	= {},
 		tasks	= [],
