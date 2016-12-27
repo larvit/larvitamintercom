@@ -65,16 +65,8 @@ intercom.consume(options, function(message, ack, deliveryTag) {
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err, consumeInstance) {
+}, function(err) {
 	// Callback from established consume connection
-
-	// Stop consuming when your application is not interested any more
-	setTimeout(function() {
-		consumeInstance.cancel(function(err) {
-			if (err) throw err;
-			// IMPORTANT!!! This callback is syncronous and does NOT guarantee no more messages comes on the consume()
-		});
-	}, 3600000);
 });
 ```
 
@@ -106,14 +98,6 @@ intercom.subscribe(options, function(message, ack, deliveryTag) {
 	ack(new Error('Something was wrong with the message'));
 }, function(err, subscribeInstance) {
 	// Callback from established subscribe connection
-
-	// Stop consuming when your application is not interested any more
-	setTimeout(function() {
-		subscribeInstance.cancel(function(err) {
-			if (err) throw err;
-			// IMPORTANT!!! This callback is syncronous and does NOT guarantee no more messages comes on the subscribe()
-		});
-	}, 3600000);
 });
 ```
 
