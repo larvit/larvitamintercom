@@ -26,6 +26,7 @@ function Intercom(conStr) {
 
 	that.channelName	= 1;
 	that.cmdQueue	= [];
+	that.conStr	= conStr;
 	that.declaredExchanges	= [];
 	that.host	= parsedConStr.hostname;
 	that.port	= parsedConStr.port || 5672;
