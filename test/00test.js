@@ -371,19 +371,21 @@ describe('Send and receive', function() {
 	it('should not receive after the consumation is cancelled', function(done) {
 		const	consumeIntercom	= intercoms[14],
 			sendIntercom	= intercoms[15],
-			exchangeName	= 'notReceiveAfterConsumeCancel';
+			exchangeYes	= 'receiveAfterConsumeCancel',
+			exchangeNo	= 'notReceiveAfterConsumeCancel';
 
-		let	receivedMessages	= 0,
+		let	receivedYesMsgs	= 0,
+			receivedNoMsgs	= 0,
 			consumeInstance;
 
 		this.slow(1000);
 
 		// Handle a message from queue
-		function handleMsg(message, ack) {
+		function handleNoMsg(message, ack) {
 			ack();
-			receivedMessages ++;
+			receivedNoMsgs ++;
 
-			if (receivedMessages === 1) {
+			if (receivedNoMsgs === 1) {
 				consumeInstance.cancel(function(err) {
 					if (err) throw err;
 
@@ -395,22 +397,39 @@ describe('Send and receive', function() {
 			}
 		}
 
-		consumeIntercom.consume({'exchange': exchangeName}, handleMsg, function(err, result) {
+		function handleYesMsg(message, ack) {
+			ack();
+			receivedYesMsgs ++;
+		}
+
+		consumeIntercom.consume({'exchange': exchangeNo}, handleNoMsg, function(err, result) {
 			consumeInstance = result;
-			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeName}, function(err) {
+			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeNo}, function(err) {
+				if (err) throw err;
+			});
+			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeYes}, function(err) {
 				if (err) throw err;
 			});
 		});
 
+		consumeIntercom.consume({'exchange': exchangeYes}, handleYesMsg, function(err) {
+			if (err) throw err;
+		});
+
 		function sendAgain() {
-			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeName}, function(err) {
+			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeNo}, function(err) {
 				if (err) throw err;
 
 				// Wait a while, and then make sure we have not gotten a second message
 				setTimeout(function() {
-					assert.deepEqual(receivedMessages, 1);
+					assert.deepEqual(receivedNoMsgs,	1);
+					assert.deepEqual(receivedYesMsgs,	2);
 					done();
 				}, 200);
+			});
+
+			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeYes}, function(err) {
+				if (err) throw err;
 			});
 		}
 	});
@@ -418,19 +437,21 @@ describe('Send and receive', function() {
 	it('should not receive after the subscription is cancelled', function(done) {
 		const	subscribeIntercom	= intercoms[16],
 			sendIntercom	= intercoms[17],
-			exchangeName	= 'notReceiveAfterSubscribeCancel';
+			exchangeYes	= 'receiveAfterSubscribeCancel',
+			exchangeNo	= 'notReceiveAfterSubscribeCancel';
 
-		let	receivedMessages	= 0,
+		let	receivedYesMsgs	= 0,
+			receivedNoMsgs	= 0,
 			subscribeInstance;
 
 		this.slow(1000);
 
 		// Handle a message from queue
-		function handleMsg(message, ack) {
+		function handleNoMsg(message, ack) {
 			ack();
-			receivedMessages ++;
+			receivedNoMsgs ++;
 
-			if (receivedMessages === 1) {
+			if (receivedNoMsgs === 1) {
 				subscribeInstance.cancel(function(err) {
 					if (err) throw err;
 
@@ -442,22 +463,39 @@ describe('Send and receive', function() {
 			}
 		}
 
-		subscribeIntercom.subscribe({'exchange': exchangeName}, handleMsg, function(err, result) {
+		function handleYesMsg(message, ack) {
+			ack();
+			receivedYesMsgs ++;
+		}
+
+		subscribeIntercom.subscribe({'exchange': exchangeNo}, handleNoMsg, function(err, result) {
 			subscribeInstance = result;
-			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeName}, function(err) {
+			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeNo}, function(err) {
+				if (err) throw err;
+			});
+			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeYes}, function(err) {
 				if (err) throw err;
 			});
 		});
 
+		subscribeIntercom.subscribe({'exchange': exchangeYes}, handleYesMsg, function(err) {
+			if (err) throw err;
+		});
+
 		function sendAgain() {
-			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeName}, function(err) {
+			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeNo}, function(err) {
 				if (err) throw err;
 
 				// Wait a while, and then make sure we have not gotten a second message
 				setTimeout(function() {
-					assert.deepEqual(receivedMessages, 1);
+					assert.deepEqual(receivedNoMsgs,	1);
+					assert.deepEqual(receivedYesMsgs,	2);
 					done();
 				}, 200);
+			});
+
+			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeYes}, function(err) {
+				if (err) throw err;
 			});
 		}
 	});
