@@ -226,6 +226,10 @@ Intercom.prototype.bindQueue = function(queueName, exchange, cb) {
 Intercom.prototype.close = function(cb) {
 	const	that = this;
 
+	if (typeof cb !== 'function') {
+		cb = function() {};
+	}
+
 	log.verbose('larvitamintercom: close() - on ' + that.host + ':' + that.port);
 
 	if (that.queueReady !== true) {
