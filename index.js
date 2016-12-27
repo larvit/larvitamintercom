@@ -112,6 +112,34 @@ function Intercom(conStr) {
 		cb();
 	});
 
+	// Construct generic handle comms
+	tasks.push(function(cb) {
+		that.handle.cmd = function cmd(cmdStr, params, cb) {
+			const	cmdGroupName	= cmdStr.split('.')[0],
+				cmdName	= cmdStr.split('.')[1];
+
+			log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" running');
+
+			// Register the callback
+			params.push(function(err) {
+				if (err) {
+					log.warn('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+					cb(err);
+					return;
+				}
+
+				log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" succeeded');
+
+				that.handle.once(that.channelName + ':' + cmdStr + '-ok', function(channel, method, data) {
+					log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '", answer received from queue');
+					cb(err, channel, method, data);
+				});
+			});
+			that.handle[cmdGroupName][cmdName].apply(null, params);
+		};
+		cb();
+	});
+
 	async.series(tasks, function(err) {
 		if ( ! err) {
 			log.debug('larvitamintercom: Intercom() - Initialized on ' + that.host + ':' + that.port);
@@ -143,7 +171,7 @@ Intercom.prototype.bindQueue = function(queueName, exchange, cb) {
 		return;
 	}
 
-	that.handle.queue.bind(that.channelName, queueName, exchange, 'ignored-routing-key', noWait, args, function(err) {
+	that.handle.cmd('queue.bind', [that.channelName, queueName, exchange, 'ignored-routing-key', noWait, args], function(err) {
 		if (err) {
 			log.error('larvitamintercom: bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchange + '", err: ' + err.message);
 		}
@@ -237,38 +265,18 @@ Intercom.prototype.declareExchange = function(exchangeName, cb) {
 
 	log.verbose('larvitamintercom: declareExchange() - Declaring exchangeName: "' + exchangeName + '"');
 
-	that.handle.exchange.declare(
-		that.channelName,
-		exchangeName,
-		exchangeType,
-		passive,
-		durable,
-		autoDelete,
-		internal,
-		noWait,
-		args,
-		function(err) {
-			if (err) {
-				log.warn('larvitamintercom: declareExchange() - Could not declare exchange "' + exchangeName + '", err: ' + err.message);
-			} else {
-				that.declaredExchanges.push(exchangeName);
-			}
-
-			log.debug('larvitamintercom: declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
-
-			that.declaredExchanges.push(exchangeName);
+	that.handle.cmd('exchange.declare', [that.channelName, exchangeName, exchangeType, passive, durable, autoDelete, internal, noWait, args], function(err) {
+		if (err) {
+			log.warn('larvitamintercom: declareExchange() - Could not declare exchange "' + exchangeName + '", err: ' + err.message);
 			cb(err);
+			return;
 		}
-	);
 
-	/* Alternate method
-	that.handle.once('1:exchange.declare-ok', function(channel, method, data) {
-		console.log('exchange declared');
-		console.log(channel);
-		console.log(method);
-		console.log(data);
-		cb();
-	});*/
+		log.debug('larvitamintercom: declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
+
+		that.declaredExchanges.push(exchangeName);
+		cb(err);
+	});
 };
 
 /**
@@ -304,16 +312,18 @@ Intercom.prototype.declareQueue = function(options, cb) {
 		return;
 	}
 
-	that.handle.queue.declare(that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args, function(err) {
+	that.handle.cmd('queue.declare', [that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args], function(err, channel, method, data) {
+		let queueName;
+
 		if (err) {
 			log.error('larvitamintercom: declareQueue() - Could not declare queue, name: "' + options.queueName + '" err: ' + err.message);
+			cb(err);
+			return;
 		}
 
-		that.handle.once(that.channelName + ':queue.declare-ok', function(channel, method, data) {
-			const queueName = data.queue;
-			log.debug('larvitamintercom: declareQueue() - Declared! queueName: "' + queueName + '" exclusive: ' + options.exclusive.toString());
-			cb(err, queueName);
-		});
+		queueName = data.queue;
+		log.debug('larvitamintercom: declareQueue() - Declared! queueName: "' + queueName + '" exclusive: ' + options.exclusive.toString());
+		cb(err, queueName);
 	});
 };
 
@@ -433,8 +443,7 @@ Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 			exclusive	= options.exclusive,	// Request exclusive consumer access, meaning only this consumer can access the queue.
 			args	= {};	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
 
-		that.handle.basic.consume(that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args);
-		that.handle.once(that.channelName + ':basic.consume-ok', function(channel, method, data) {
+		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function(err, channel, method, data) {
 			returnObj.channel	= channel;
 			returnObj.method	= method;
 			returnObj.data	= data;
