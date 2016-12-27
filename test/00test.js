@@ -26,7 +26,7 @@ before(function(done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 14; i ++) {
+		for (let i = 0; i < 16; i ++) {
 			tasks.push(function(cb) {
 				const	intercom	= new Intercom(config);
 
@@ -67,7 +67,7 @@ before(function(done) {
 	});
 });
 
-after(function(done) {
+/*after(function(done) {
 	const	tasks	= [];
 
 	this.timeout(10000);
@@ -75,12 +75,18 @@ after(function(done) {
 	for (let i = 0; intercoms[i] !== undefined; i ++) {
 		const	intercom	= intercoms[i];
 		tasks.push(function(cb) {
-			intercom.close(cb);
+			console.log('Closing intercom ' + i);
+			intercom.close(function(err) {
+				if (err) throw err;
+
+				console.log('Closed intercom: ' + i);
+				cb(err);
+			});
 		});
 	}
 
 	async.parallel(tasks, done);
-});
+});*/
 
 describe('Send and receive', function() {
 	it('check so the first intercom is up', function(done) {
@@ -340,8 +346,8 @@ describe('Send and receive', function() {
 		const	exchange	= 'dkfia893M', // Random exchange to not collide with another test
 			orgMsg	= {'foo': 'bar'};
 
-		this.timeout(500);
-		this.slow(420); // > 1050 is shown in yellow, 1000ms is setTimeout()
+		this.timeout(2000);
+		this.slow(700);
 
 		intercoms[0].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function(err) {
 			if (err) throw err;
@@ -360,5 +366,52 @@ describe('Send and receive', function() {
 				});
 			}, 200);
 		});
+	});
+
+	it('should not receive after the consumation ends', function(done) {
+		const	consumeIntercom	= intercoms[14],
+			sendIntercom	= intercoms[15],
+			exchangeName	= 'notReceiveAfterConsumeEnd';
+
+		let	receivedMessages	= 0,
+			consumeInstance;
+
+		this.slow(1000);
+
+		// Handle a message from queue
+		function handleMsg(message, ack) {
+			ack();
+			receivedMessages ++;
+
+			if (receivedMessages === 1) {
+				consumeInstance.cancel(function(err) {
+					if (err) throw err;
+
+					// The callback is sadly not trustworthy. Instead wait a bit and try again
+					setTimeout(function() {
+						sendAgain();
+					}, 200);
+				});
+			}
+		}
+
+		consumeIntercom.consume({'exchange': exchangeName}, handleMsg, function(err, result) {
+			consumeInstance = result;
+			sendIntercom.send({'foo': 'bar1'}, {'exchange': exchangeName}, function(err) {
+				if (err) throw err;
+			});
+		});
+
+		function sendAgain() {
+			sendIntercom.send({'foo': 'bar2'}, {'exchange': exchangeName}, function(err) {
+				if (err) throw err;
+
+				// Wait a while, and then make sure we have not gotten a second message
+				setTimeout(function() {
+					assert.deepEqual(receivedMessages, 1);
+					done();
+				}, 200);
+			});
+		}
 	});
 });

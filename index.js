@@ -185,7 +185,8 @@ Intercom.prototype.close = function(cb) {
 };
 
 Intercom.prototype.consume = function(options, msgCb, cb) {
-	const	tasks	= [],
+	const	returnObj	= {},
+		tasks	= [],
 		that	= this;
 
 	let	queueName;
@@ -211,6 +212,33 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 	queueName	= 'queTo_' + options.exchange;
 
 	log.verbose('larvitamintercom: consume() - Starting on exchange "' + options.exchange + '"');
+
+	returnObj.end = function cancel(cb) {
+		if (returnObj.data === undefined || returnObj.data['consumer-tag'] === undefined) {
+			const	err = new Error('No consumer tag is defined, consume have probably not been started yet.');
+			log.warn('larvitamintercom: consume() - ' + err.message);
+			cb(err);
+			return;
+		}
+
+		that.handle.basic.cancel(returnObj.data['consumer-tag'], function(err) {
+			if (err) {
+				log.warn('larvitamintercom: consume() - end() - Could not canceled consuming. consumer-tag: "' + returnObj.data['consumer-tag'] + '", err: ' + err.message);
+			} else {
+				log.verbose('larvitamintercom: consume() - cancel() - Canceled consuming. consumer-tag: "' + returnObj.data['consumer-tag'] + '"');
+			}
+
+			cb(err);
+		});
+		/* We could not get this to work :( // Lilleman and gagge 2016-12-27
+		that.handle.once(that.channelName + ':basic.cancel-ok', function(channel, method, data) {
+			log.verbose('larvitamintercom: consume() - cancel() - Canceled consuming.');
+			log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. channel: ' + JSON.stringify(channel));
+			log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. method: ' + JSON.stringify(method));
+			log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. data: ' + JSON.stringify(data));
+			cb();
+		});*/
+	};
 
 	// Declare exchange
 	tasks.push(function(cb) {
@@ -245,6 +273,9 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 
 		that.handle.basic.consume(that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args);
 		that.handle.once(that.channelName + ':basic.consume-ok', function(channel, method, data) {
+			returnObj.channel	= channel;
+			returnObj.method	= method;
+			returnObj.data	= data;
 			log.verbose('larvitamintercom: consume() - Started consuming with consumer tag: "' + data['consumer-tag'] + '"');
 			cb();
 		});
@@ -276,7 +307,11 @@ Intercom.prototype.consume = function(options, msgCb, cb) {
 		cb();
 	});
 
-	async.series(tasks, cb);
+	async.series(tasks, function(err) {
+		if (err) { cb(err); return; }
+
+		cb(err, returnObj);
+	});
 };
 
 Intercom.prototype.declareExchange = function(exchangeName, cb) {

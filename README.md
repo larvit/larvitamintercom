@@ -54,7 +54,7 @@ const	Intercom	= require('larvitamintercom'),
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom(conStr);
 
-let options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
+let	options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
 
 intercom.consume(options, function(message, ack, deliveryTag) {
 	// message being the object sent with intercom.send()
@@ -65,10 +65,17 @@ intercom.consume(options, function(message, ack, deliveryTag) {
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err) {
+}, function(err, consumeInstance) {
 	// Callback from established consume connection
-});
 
+	// Stop consuming when your application is not interested any more
+	setTimeout(function() {
+		consumeInstance.cancel(function(err) {
+			if (err) throw err;
+			// IMPORTANT!!! This callback is syncronous and does NOT guarantee no more messages comes on the consume()
+		});
+	}, 3600000);
+});
 ```
 
 ##### Default consume options:
@@ -97,8 +104,16 @@ intercom.subscribe(options, function(message, ack, deliveryTag) {
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err) {
+}, function(err, subscribeInstance) {
 	// Callback from established subscribe connection
+
+	// Stop consuming when your application is not interested any more
+	setTimeout(function() {
+		subscribeInstance.cancel(function(err) {
+			if (err) throw err;
+			// IMPORTANT!!! This callback is syncronous and does NOT guarantee no more messages comes on the subscribe()
+		});
+	}, 3600000);
 });
 ```
 
