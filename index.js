@@ -25,12 +25,13 @@ function Intercom(conStr) {
 		that	= this;
 
 	that.channelName	= 1;
+	that.cmdQueue	= [];
+	that.declaredExchanges	= [];
 	that.host	= parsedConStr.hostname;
 	that.port	= parsedConStr.port || 5672;
-	that.declaredExchanges	= [];
-	that.sendQueue	= [];
-	that.sendInProgress	= false;
 	that.queueReady	= false;
+	that.sendInProgress	= false;
+	that.sendQueue	= [];
 
 	that.socket = net.connect({
 		'port': that.port,
@@ -115,27 +116,65 @@ function Intercom(conStr) {
 	// Construct generic handle comms
 	tasks.push(function(cb) {
 		that.handle.cmd = function cmd(cmdStr, params, cb) {
-			const	cmdGroupName	= cmdStr.split('.')[0],
-				cmdName	= cmdStr.split('.')[1];
+			that.cmdQueue.push({'cmdStr': cmdStr, 'params': params, 'cb': cb});
 
-			log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" running');
+			log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" added to run queue');
 
-			// Register the callback
-			params.push(function(err) {
-				if (err) {
-					log.warn('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
-					cb(err);
-					return;
-				}
+			if (that.cmdInProgress === true) {
+				return;
+			}
 
-				log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" succeeded');
+			that.cmdInProgress = true;
 
-				that.handle.once(that.channelName + ':' + cmdStr + '-ok', function(channel, method, data) {
-					log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '", answer received from queue');
-					cb(err, channel, method, data);
+			function readFromQueue() {
+				const	mainParams	= that.cmdQueue.shift(),
+					cmdStr	= mainParams.cmdStr,
+					params	= mainParams.params,
+					cb	= mainParams.cb,
+					tasks	= [];
+
+				let	channel,
+					method,
+					data;
+
+				// Register the callback
+				tasks.push(function(cb) {
+					const	cmdGroupName	= cmdStr.split('.')[0],
+						cmdName	= cmdStr.split('.')[1];
+
+					params.push(function(err) {
+						if (err) {
+							log.warn('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+							cb(err);
+							return;
+						}
+
+						log.debug('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
+
+						that.handle.once(that.channelName + ':' + cmdStr + '-ok', function(x, y, z) {
+							// We want these in the outer scope, thats why the weird naming
+							channel	= x;
+							method	= y;
+							data	= z;
+
+							log.debug('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
+							cb(err);
+						});
+					});
+					that.handle[cmdGroupName][cmdName].apply(null, params);
 				});
-			});
-			that.handle[cmdGroupName][cmdName].apply(null, params);
+
+				async.series(tasks, function(err) {
+					cb(err, channel, method, data);
+
+					if (that.cmdQueue.length === 0) {
+						that.cmdInProgress = false;
+					} else {
+						readFromQueue();
+					}
+				});
+			}
+			readFromQueue();
 		};
 		cb();
 	});
