@@ -26,6 +26,7 @@ function Intercom(conStr) {
 
 	that.channelName	= 1;
 	that.cmdQueue	= [];
+	that.conStr	= conStr;
 	that.declaredExchanges	= [];
 	that.host	= parsedConStr.hostname;
 	that.port	= parsedConStr.port || 5672;
@@ -225,6 +226,10 @@ Intercom.prototype.bindQueue = function(queueName, exchange, cb) {
 Intercom.prototype.close = function(cb) {
 	const	that = this;
 
+	if (typeof cb !== 'function') {
+		cb = function() {};
+	}
+
 	log.verbose('larvitamintercom: close() - on ' + that.host + ':' + that.port);
 
 	if (that.queueReady !== true) {
@@ -411,6 +416,7 @@ Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 
 	queueName	= 'queTo_' + options.exchange;
 
+	/* This cancels subscription to all queues and exchanges on the current connection... we obviously do not want that so it is disabled atm
 	returnObj.cancel = function cancel(cb) {
 		if (typeof cb !== 'function') {
 			cb = function() {};
@@ -432,15 +438,15 @@ Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 
 			cb(err);
 		});
-		/* We could not get this to work :( // Lilleman and gagge 2016-12-27
-		that.handle.once(that.channelName + ':basic.cancel-ok', function(channel, method, data) {
-			log.verbose('larvitamintercom: consume() - cancel() - Canceled consuming.');
-			log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. channel: ' + JSON.stringify(channel));
-			log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. method: ' + JSON.stringify(method));
-			log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. data: ' + JSON.stringify(data));
-			cb();
-		});*/
-	};
+		// We could not get this to work :( // Lilleman and gagge 2016-12-27
+		//that.handle.once(that.channelName + ':basic.cancel-ok', function(channel, method, data) {
+		//	log.verbose('larvitamintercom: consume() - cancel() - Canceled consuming.');
+		//	log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. channel: ' + JSON.stringify(channel));
+		//	log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. method: ' + JSON.stringify(method));
+		//	log.debug('larvitamintercom: consume() - cancel() - Canceled consuming. data: ' + JSON.stringify(data));
+		//	cb();
+		//});
+	};*/
 
 	// Declare exchange
 	tasks.push(function(cb) {
