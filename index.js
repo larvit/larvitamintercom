@@ -486,6 +486,7 @@ Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 			returnObj.channel	= channel;
 			returnObj.method	= method;
 			returnObj.data	= data;
+
 			log.verbose('larvitamintercom: genericConsume() - Started consuming with consumer tag: "' + data['consumer-tag'] + '"');
 			cb();
 		});
@@ -522,6 +523,15 @@ Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 
 		cb(err, returnObj);
 	});
+};
+
+Intercom.prototype.ready = function(cb) {
+	if (this.queueReady === true) {
+		cb();
+		return;
+	}
+
+	this.on('ready', cb);
 };
 
 /**
