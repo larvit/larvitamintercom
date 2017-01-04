@@ -114,16 +114,35 @@ function Intercom(conStr) {
 		cb();
 	});
 
+	// Log all handle events
+	// Should be disabled in production code and only manually enabled while debugging due to it being expensive
+	/** /tasks.push(function(cb) {
+		const	oldEmitter	= that.handle.emit;
+
+		that.handle.emit = function() {
+			const	emitArgs	= arguments;
+
+			log.silly('larvitamintercom: handle.on("' + arguments[0] + '"), all arguments: "' + JSON.stringify(arguments) + '"');
+
+			oldEmitter.apply(that.handle, arguments);
+		}
+
+		cb();
+	});/**/
+
 	// Construct generic handle comms
 	tasks.push(function(cb) {
 		that.handle.cmd = function cmd(cmdStr, params, cb) {
 			that.cmdQueue.push({'cmdStr': cmdStr, 'params': params, 'cb': cb});
 
-			log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" added to run queue');
+			log.debug('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" added to run queue. params: "' + JSON.stringify(params) + '"');
 
 			if (that.cmdInProgress === true) {
+				log.silly('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" cmdInProgress === true');
 				return;
 			}
+
+			log.silly('larvitamintercom: handle.cmd() - cmdStr: "' + cmdStr + '" cmdInProgress !== true');
 
 			that.cmdInProgress = true;
 
@@ -143,24 +162,40 @@ function Intercom(conStr) {
 					const	cmdGroupName	= cmdStr.split('.')[0],
 						cmdName	= cmdStr.split('.')[1];
 
+					let	callCb	= true,
+						okTimeout;
+
+					okTimeout = setTimeout(function() {
+						const	err	= new Error('no answer received from queue within 500ms');
+						log.error('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
+						callCb = false;
+						cb(err);
+					}, 500);
+
+					that.handle.once(that.channelName + ':' + cmdStr + '-ok', function(x, y, z) {
+						// We want these in the outer scope, thats why the weird naming
+						channel	= x;
+						method	= y;
+						data	= z;
+
+						log.debug('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
+						if (callCb === false) {
+							log.warn('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received but to late; timeout have already happened');
+							return;
+						}
+						clearTimeout(okTimeout);
+						cb();
+					});
+
 					params.push(function(err) {
 						if (err) {
 							log.warn('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+							callCb = false;
 							cb(err);
 							return;
 						}
 
 						log.debug('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
-
-						that.handle.once(that.channelName + ':' + cmdStr + '-ok', function(x, y, z) {
-							// We want these in the outer scope, thats why the weird naming
-							channel	= x;
-							method	= y;
-							data	= z;
-
-							log.debug('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
-							cb(err);
-						});
 					});
 					that.handle[cmdGroupName][cmdName].apply(null, params);
 				});
@@ -169,8 +204,10 @@ function Intercom(conStr) {
 					cb(err, channel, method, data);
 
 					if (that.cmdQueue.length === 0) {
+						log.silly('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" cmdQueue.length === 0');
 						that.cmdInProgress = false;
 					} else {
+						log.silly('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" readFromQueue() rerunning');
 						readFromQueue();
 					}
 				});
@@ -469,11 +506,21 @@ Intercom.prototype.genericConsume = function(options, msgCb, cb) {
 			args	= {};	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
 
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function(err, channel, method, data) {
+			let	consumerTag;
+
+			if (err) { cb(err); return; }
+
 			returnObj.channel	= channel;
 			returnObj.method	= method;
 			returnObj.data	= data;
 
-			log.verbose('larvitamintercom: genericConsume() - Started consuming with consumer tag: "' + data['consumer-tag'] + '"');
+			if (data !== undefined && data['consumer-tag'] !== undefined) {
+				consumerTag = data['conumer-tag'];
+			} else {
+				log.warn('larvitamintercom: genericConsume() - No consumerTag obtained for queue: "' + queueName + '"');
+			}
+
+			log.verbose('larvitamintercom: genericConsume() - Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
 			cb();
 		});
 	});
