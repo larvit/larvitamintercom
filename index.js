@@ -41,6 +41,21 @@ function Intercom(conStr) {
 
 	log.verbose('larvitamintercom: Intercom() - Initializing on ' + that.host + ':' + that.port);
 
+	that.socket.on('error', function(err) {
+		log.error('larvitamintercom: Intercom() - socket error: ' + err.message);
+	});
+
+	that.socket.on('close', function(hadError) {
+		log.info('larvitamintercom: Intercom() - socket closed');
+		if (hadError) {
+			log.error('larvitamintercom: Intercom() - socket closed with error');
+		}
+	});
+
+	that.socket.on('end', function() {
+		log.info('larvitamintercom: Intercom() - socket connection ended by remote');
+	});
+
 	// Create handle by socket connect to rabbitmq
 	tasks.push(function(cb) {
 		bramqp.initialize(that.socket, 'rabbitmq/full/amqp0-9-1.stripped.extended', function(err, result) {
@@ -189,7 +204,7 @@ function Intercom(conStr) {
 
 					params.push(function(err) {
 						if (err) {
-							log.warn('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+							log.error('larvitamintercom: handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
 							callCb = false;
 							cb(err);
 							return;
