@@ -368,6 +368,18 @@ describe('Send and receive', function() {
 		});
 	});
 
+	it('should destroy a socket and restart it', function(done) {
+		const	intercom	= intercoms[0];
+
+		intercom.socket.destroy();
+
+		intercom.send({'foo': 'bar'}, function(err) {
+			if (err) throw err;
+
+			done();
+		});
+	});
+
 	/* Disabled until .cancel() is fixed
 	it('should not receive after the consumation is cancelled', function(done) {
 		const	consumeIntercom	= intercoms[14],
