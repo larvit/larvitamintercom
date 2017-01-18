@@ -640,7 +640,7 @@ Intercom.prototype.send = function(orgMsg, options, cb) {
 			return;
 		}
 
-		log.debug('larvitamintercom: send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+		log.debug('larvitamintercom: send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
 
 		// Declare exchange
 		tasks.push(function(cb) {
