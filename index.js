@@ -289,7 +289,6 @@ Intercom.prototype.close = function(cb) {
 				return;
 			}
 
-			that.handle.socket.end();
 			setImmediate(function() {
 				log.debug('larvitamintercom: close() - closed ' + that.host + ':' + that.port);
 				cb();
