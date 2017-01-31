@@ -26,7 +26,7 @@ before(function(done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 18; i ++) {
+		for (let i = 0; i < 20; i ++) {
 			tasks.push(function(cb) {
 				const	intercom	= new Intercom(config);
 
@@ -207,91 +207,127 @@ describe('Send and receive', function() {
 	});
 
 	it('send and receive on the same Intercom', function(done) {
-		const	exchange	= 'sameInstance',
-			orgMsg	= {'bi': 'bu'};
+		const	intercom	= {'subscribe': intercoms[10], 'consume': intercoms[11]},
+			tasks	= [];
 
-		intercoms[10].subscribe({'exchange': exchange}, function(msg, ack, deliveryTag) {
-			assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
-			delete msg.uuid;
-			assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-			assert(deliveryTag, 'deliveryTag shoult be non-empty');
-			ack();
-			done();
-		}, function(err) {
-			if (err) throw err;
+		for (const method of Object.keys(intercom)) {
+			tasks.push(function(cb) {
+				const	exchange	= 'sameInstance' + method,
+					orgMsg	= {'bi': 'bu'};
 
-			intercoms[10].send(orgMsg, {'exchange': exchange}, function(err) {
-				if (err) throw err;
+				intercom[method][method]({'exchange': exchange}, function(msg, ack, deliveryTag) {
+					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+					delete msg.uuid;
+					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+					assert(deliveryTag, 'deliveryTag shoult be non-empty');
+					ack();
+					cb();
+				}, function(err) {
+					if (err) throw err;
+
+					intercom[method].send(orgMsg, {'exchange': exchange}, function(err) {
+						if (err) throw err;
+					});
+				});
 			});
-		});
+		}
+
+		async.parallel(tasks, done);
 	});
 
 	it('send and receive multiple messages on different Intercoms', function(done) {
-		const	exchange	= 'anotherInstance',
-			orgMsg1	= {'ba': 'bo'},
-			orgMsg2	= {'waff': 'woff'};
+		const	tasks	= [],
+			intercom	= {
+				'subscribe': {
+					'intercom1': intercoms[12], 'intercom2': intercoms[13]
+				},
+				'consume': {
+					'intercom1': intercoms[14], 'intercom2': intercoms[15]
+				}
+			};
 
-		let	msg1Received = 0,
-			msg2Received = 0;
+		for (const method of Object.keys(intercom)) {
+			tasks.push(function(cb) {
+				const	intercom1	= intercom[method].intercom1,
+					intercom2	= intercom[method].intercom2,
+					exchange	= 'anotherInstance' + method,
+					orgMsg1	= {'ba': 'bo'},
+					orgMsg2	= {'waff': 'woff'};
 
-		intercoms[11].subscribe({'exchange': exchange}, function(msg, ack) {
-			if (JSON.stringify(msg.ba) === JSON.stringify(orgMsg1.ba)) {
-				msg1Received ++;
-				ack();
-			} else if (JSON.stringify(msg.waff) === JSON.stringify(orgMsg2.waff)) {
-				msg2Received ++;
-				ack();
-			}
+				let	msg1Received = 0,
+					msg2Received = 0;
 
-			if (msg1Received === 1 && msg2Received === 1) {
-				done();
-			}
-		}, function(err) {
-			if (err) throw err;
+				intercom1[method]({'exchange': exchange}, function(msg, ack) {
+					if (JSON.stringify(msg.ba) === JSON.stringify(orgMsg1.ba)) {
+						msg1Received ++;
+						ack();
+					} else if (JSON.stringify(msg.waff) === JSON.stringify(orgMsg2.waff)) {
+						msg2Received ++;
+						ack();
+					}
 
-			intercoms[11].send(orgMsg1, {'exchange': exchange}, function(err) {
-				if (err) throw err;
+					if (msg1Received === 1 && msg2Received === 1) {
+						cb();
+					}
+				}, function(err) {
+					if (err) throw err;
+
+					intercom1.send(orgMsg1, {'exchange': exchange}, function(err) {
+						if (err) throw err;
+					});
+
+					intercom2.send(orgMsg2, {'exchange': exchange}, function(err) {
+						if (err) throw err;
+					});
+				});
 			});
+		}
 
-			intercoms[12].send(orgMsg2, {'exchange': exchange}, function(err) {
-				if (err) throw err;
-			});
-		});
+		async.parallel(tasks, done);
 	});
 
 	it('send and receive multiple messages on the same Intercom', function(done) {
-		const	exchange	= 'yetAnotherInstance',
-			orgMsg1	= {'bar': 'bor'},
-			orgMsg2	= {'waffer': 'woffer'};
+		const	intercom	= {'subscribe': intercoms[16], 'consume': intercoms[17]},
+			tasks	= [];
 
-		let	msg1Received = 0,
-			msg2Received = 0;
+		for (const method of Object.keys(intercom)) {
+			tasks.push(function(cb) {
+				const	exchange	= 'yetAnotherInstance',
+					orgMsg1	= {'bar': 'bor'},
+					orgMsg2	= {'waffer': 'woffer'};
 
-		intercoms[13].subscribe({'exchange': exchange}, function(msg, ack) {
-			if (JSON.stringify(msg.bar) === JSON.stringify(orgMsg1.bar)) {
-				msg1Received ++;
-				ack();
-			} else if (JSON.stringify(msg.waffer) === JSON.stringify(orgMsg2.waffer)) {
-				msg2Received ++;
-				ack();
-			}
+				let	msg1Received = 0,
+					msg2Received = 0;
 
-			if (msg1Received === 10 && msg2Received === 10) {
-				done();
-			}
-		}, function(err) {
-			if (err) throw err;
+				intercom[method][method]({'exchange': exchange}, function(msg, ack) {
+					if (JSON.stringify(msg.bar) === JSON.stringify(orgMsg1.bar)) {
+						msg1Received ++;
+						ack();
+					} else if (JSON.stringify(msg.waffer) === JSON.stringify(orgMsg2.waffer)) {
+						msg2Received ++;
+						ack();
+					}
 
-			for (let i = 0; i !== 10; i ++) {
-				intercoms[13].send(orgMsg1, {'exchange': exchange}, function(err) {
+					if (msg1Received === 10 && msg2Received === 10) {
+						cb();
+					}
+				}, function(err) {
 					if (err) throw err;
-				});
 
-				intercoms[13].send(orgMsg2, {'exchange': exchange}, function(err) {
-					if (err) throw err;
+					for (let i = 0; i !== 10; i ++) {
+						intercom[method].send(orgMsg1, {'exchange': exchange}, function(err) {
+							if (err) throw err;
+						});
+
+						intercom[method].send(orgMsg2, {'exchange': exchange}, function(err) {
+							if (err) throw err;
+						});
+					}
 				});
-			}
-		});
+			});
+		}
+
+		async.parallel(tasks, done);
 	});
 
 	it('send and receive messages on different exchanges', function(done) {
