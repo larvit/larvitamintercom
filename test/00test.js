@@ -292,7 +292,7 @@ describe('Send and receive', function() {
 
 		for (const method of Object.keys(intercom)) {
 			tasks.push(function(cb) {
-				const	exchange	= 'yetAnotherInstance',
+				const	exchange	= 'yetAnotherInstance' + method,
 					orgMsg1	= {'bar': 'bor'},
 					orgMsg2	= {'waffer': 'woffer'};
 
@@ -404,7 +404,7 @@ describe('Send and receive', function() {
 		});
 	});
 
-	it('send and declare queues at the same time', function(done) {
+	it('send and declare exchanges at the same time', function(done) {
 		const	intercom	= intercoms[0],
 			exchange	= 'breakCmdChain',
 			orgMsg1	= {'blippel': 'bloppel'},
@@ -414,10 +414,10 @@ describe('Send and receive', function() {
 			msg2Received	= 0;
 
 		intercom.subscribe({'exchange': exchange}, function(msg, ack) {
-			if (JSON.stringify(msg.bar) === JSON.stringify(orgMsg1.bar)) {
+			if (JSON.stringify(msg.blippel) === JSON.stringify(orgMsg1.blippel)) {
 				msg1Received ++;
 				ack();
-			} else if (JSON.stringify(msg.waffer) === JSON.stringify(orgMsg2.waffer)) {
+			} else if (JSON.stringify(msg.maffab) === JSON.stringify(orgMsg2.maffab)) {
 				msg2Received ++;
 				ack();
 			}
