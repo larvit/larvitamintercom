@@ -33,6 +33,7 @@ function Intercom(conStr) {
 	that.queueReady	= false;
 	that.sendInProgress	= false;
 	that.sendQueue	= [];
+	that.expectingClose	= false;
 
 	that.socket = net.connect({
 		'port': that.port,
@@ -125,6 +126,16 @@ function Intercom(conStr) {
 
 				that.emit('incoming_msg_' + exchange, message, deliveryTag);
 			});
+		});
+		cb();
+	});
+
+	// Register listener for close events
+	tasks.push(function(cb) {
+		that.handle.on('connection.close', function(channel, method, data) {
+			if (that.expectingClose === false) {
+				log.error('larvitamintercom: Intercom() - Unexpected connection.close! channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
+			}
 		});
 		cb();
 	});
@@ -278,6 +289,8 @@ Intercom.prototype.close = function(cb) {
 	}
 
 	log.verbose('larvitamintercom: close() - on ' + that.host + ':' + that.port);
+
+	that.expectingClose = true;
 
 	that.ready(function(err) {
 		if (err) { cb(err); return; }

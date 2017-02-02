@@ -404,6 +404,47 @@ describe('Send and receive', function() {
 		});
 	});
 
+	it('send and declare queues at the same time', function(done) {
+		const	intercom	= intercoms[0],
+			exchange	= 'breakCmdChain',
+			orgMsg1	= {'blippel': 'bloppel'},
+			orgMsg2	= {'maffab': 'berk'};
+
+		let	msg1Received	= 0,
+			msg2Received	= 0;
+
+		intercom.subscribe({'exchange': exchange}, function(msg, ack) {
+			if (JSON.stringify(msg.bar) === JSON.stringify(orgMsg1.bar)) {
+				msg1Received ++;
+				ack();
+			} else if (JSON.stringify(msg.waffer) === JSON.stringify(orgMsg2.waffer)) {
+				msg2Received ++;
+				ack();
+			}
+
+			if (msg1Received === 10 && msg2Received === 10) {
+				done();
+			}
+		}, function(err) {
+			if (err) throw err;
+
+			for (let i = 0; i !== 10; i ++) {
+				intercom.send(orgMsg1, {'exchange': exchange}, function(err) {
+					if (err) throw err;
+				});
+
+				// Lets provoke!
+				intercom.declareExchange(exchange + '_foobar', function(err) {
+					if (err) throw err;
+				});
+
+				intercom.send(orgMsg2, {'exchange': exchange}, function(err) {
+					if (err) throw err;
+				});
+			}
+		});
+	});
+
 	/* Disabled until .cancel() is fixed
 	it('should not receive after the consumation is cancelled', function(done) {
 		const	consumeIntercom	= intercoms[14],
