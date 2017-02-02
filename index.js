@@ -191,6 +191,10 @@ function Intercom(conStr) {
 					method,
 					data;
 
+				if ( ! Array.isArray(params)) {
+					params = [];
+				}
+
 				// Register the callback
 				tasks.push(function(cb) {
 					const	cmdGroupName	= cmdStr.split('.')[0],
