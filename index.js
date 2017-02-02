@@ -183,11 +183,11 @@ function Intercom(conStr) {
 			function readFromQueue() {
 				const	mainParams	= that.cmdQueue.shift(),
 					cmdStr	= mainParams.cmdStr,
-					params	= mainParams.params,
 					cb	= mainParams.cb,
 					tasks	= [];
 
-				let	channel,
+				let	params	= mainParams.params,
+					channel,
 					method,
 					data;
 
