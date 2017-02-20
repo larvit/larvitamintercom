@@ -33,4 +33,6 @@ addons:
     packages:
     - g++-4.8
 
-script: env CONFFILE=amqp_travis.json mocha
+script:
+  - script: env CONSTR="amqp://guest:guest@127.0.0.1/" mocha
+  - script: env CONSTR="loopback interface" mocha

@@ -8,7 +8,8 @@ const	intercoms	= [],
 	log	= require('winston'),
 	fs	= require('fs');
 
-let	confFile;
+let	confFile,
+	conStr;
 
 // Set up winston
 log.remove(log.transports.Console);
@@ -39,10 +40,16 @@ before(function(done) {
 		async.parallel(tasks, done);
 	}
 
-	if (process.env.CONFFILE === undefined) {
-		confFile = __dirname + '/../config/amqp_test.json';
+	if (process.env.CONSTR === undefined) {
+		confFile	= __dirname + '/../config/amqp_test.json';
 	} else {
-		confFile = process.env.CONFFILE;
+		conStr	= process.env.CONSTR;
+	}
+
+	if (conStr !== undefined) {
+		log.verbose('Autobahn using environment CONSTR');
+		instantiateIntercoms(conStr);
+		return;
 	}
 
 	log.verbose('Autobahn config file: "' + confFile + '"');
@@ -56,14 +63,14 @@ before(function(done) {
 			fs.stat(confFile, function(err) {
 				if (err) throw err;
 				log.verbose('Autobahn config: ' + JSON.stringify(require(confFile)));
-				instantiateIntercoms(require(confFile).default);
+				instantiateIntercoms(require(confFile));
 			});
 
 			return;
 		}
 
 		log.verbose('Autobahn config: ' + JSON.stringify(require(confFile)));
-		instantiateIntercoms(require(confFile).default);
+		instantiateIntercoms(require(confFile));
 	});
 });
 
