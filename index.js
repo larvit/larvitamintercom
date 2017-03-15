@@ -195,8 +195,8 @@ function Intercom(conStr) {
 			function readFromQueue() {
 				const	mainParams	= that.cmdQueue.shift(),
 					cmdStr	= mainParams.cmdStr,
-					cb	= mainParams.cb,
-					tasks	= [];
+					tasks	= [],
+					cb	= mainParams.cb;
 
 				let	params	= mainParams.params,
 					channel,
@@ -215,7 +215,21 @@ function Intercom(conStr) {
 					let	callCb	= true,
 						okTimeout;
 
-					if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1) {
+					function cmdCb(err) {
+						if (err) {
+							log.error(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+							callCb = false;
+							return cb(err);
+						}
+
+						log.debug(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
+
+						if (cmdStrsWithoutOk.indexOf(cmdStr) !== - 1) {
+							cb();
+						}
+					}
+
+					if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1 && that.loopback === false) {
 						okTimeout = setTimeout(function () {
 							const	err	= new Error('no answer received from queue within 500ms');
 							log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
@@ -239,25 +253,9 @@ function Intercom(conStr) {
 						});
 					}
 
-					params.push(function (err) {
-						if (err) {
-							log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
-							callCb = false;
-							return cb(err);
-						}
+					params.push(cmdCb);
 
-						log.debug(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
-
-						if (cmdStrsWithoutOk.indexOf(cmdStr) !== - 1) {
-							cb();
-						}
-					});
-
-					if (that.loopback === true) {
-						if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1) {
-							that.handle.emit(that.channelName + ':' + cmdStr + '-ok', that.channelName, cmdStr, 'blah');
-						}
-					} else if (cmdName) {
+					if (cmdName) {
 						that.handle[cmdGroupName][cmdName].apply(that.handle, params);
 					} else {
 						that.handle[cmdGroupName].apply(that.handle, params);
@@ -309,6 +307,8 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 
 	log.verbose(topLogPrefix + 'bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
+	if (that.loopback === true) return cb();
+
 	that.ready(function (err) {
 		if (err) return cb(err);
 
@@ -332,7 +332,12 @@ Intercom.prototype.close = function (cb) {
 		cb = function () {};
 	}
 
-	log.verbose(topLogPrefix + 'close() - on ' + that.host + ':' + that.port);
+	if (that.loopback === true) {
+		log.verbose(topLogPrefix + 'close() - on loopback interface');
+		return cb();
+	} else {
+		log.verbose(topLogPrefix + 'close() - on ' + that.host + ':' + that.port);
+	}
 
 	that.expectingClose = true;
 
@@ -389,6 +394,8 @@ Intercom.prototype.declareExchange = function (exchangeName, cb) {
 
 	log.debug(topLogPrefix + 'declareExchange() - exchangeName: "' + exchangeName + '"');
 
+	if (that.loopback === true) return cb();
+
 	that.ready(function (err) {
 		if (err) return cb(err);
 
@@ -436,6 +443,8 @@ Intercom.prototype.declareQueue = function (options, cb) {
 	if (options.exclusive === undefined)	{ options.exclusive	= false;	}
 
 	log.verbose(topLogPrefix + 'declareQueue() - Declaring queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
+
+	if (that.loopback === true) return cb();
 
 	that.ready(function (err) {
 		if (err) return cb(err);
@@ -572,6 +581,9 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 			exclusive	= options.exclusive,	// Request exclusive consumer access, meaning only this consumer can access the queue.
 			args	= {};	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
 
+		// No need to send a command on the queue for the loopback, handle this directly in the send function
+		if (that.loopback === true) return cb();
+
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function (err, channel, method, data) {
 			let	consumerTag;
 
@@ -595,6 +607,13 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	// Register msgCb
 	tasks.push(function (cb) {
 		const	eventName	= 'incoming_msg_' + options.exchange;
+
+		// No need to send a command on the queue for the loopback, handle this directly in the send function
+		if (that.loopback === true) {
+----			msbCb()
+			return cb();
+		}
+
 
 		if (that.listenerCount(eventName) !== 0) {
 			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
@@ -676,6 +695,11 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 	}
 
 	log.debug(topLogPrefix + 'send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
+
+	if (that.loopback === true) {
+		that.emit('incoming_msg_' + options.exchange, stringifiedMsg, uuidLib.v4());
+		return cb();
+	}
 
 	// Declare exchange
 	tasks.push(function (cb) {
