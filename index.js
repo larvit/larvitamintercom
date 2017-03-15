@@ -1,7 +1,7 @@
 'use strict';
 
 const	EventEmitter	= require('events').EventEmitter,
-	logPrefix	= 'larvitamintercom: ',
+	topLogPrefix	= 'larvitamintercom: index.js - ',
 	uuidLib	= require('uuid'),
 	bramqp	= require('bramqp'),
 	lUtils	= require('larvitutils'),
@@ -24,7 +24,7 @@ const	EventEmitter	= require('events').EventEmitter,
  */
 function Intercom(conStr) {
 	const	parsedConStr	= url.parse(conStr),
-		thisLogPrefix	= logPrefix + 'Intercom() - ',
+		logPrefix	= topLogPrefix + 'Intercom() - ',
 		tasks	= [],
 		that	= this;
 
@@ -32,16 +32,16 @@ function Intercom(conStr) {
 	that.cmdQueue	= [];
 	that.conStr	= conStr;
 	that.declaredExchanges	= [];
-	that.sendInProgress	= false;
-	that.sendQueue	= [];
 	that.expectingClose	= false;
 	that.queueReady	= false;
+	that.sendInProgress	= false;
+	that.sendQueue	= [];
 
 	if (conStr === 'loopback interface') {
 		that.loopback	= true;
 		that.handle	= new EventEmitter;
 
-		log.verbose(thisLogPrefix + 'Initializing on loopback interface');
+		log.verbose(logPrefix + 'Initializing on loopback interface');
 	} else {
 		that.loopback	= false;
 		that.host	= parsedConStr.hostname;
@@ -52,32 +52,32 @@ function Intercom(conStr) {
 			'host':	that.host
 		});
 
-		log.verbose(thisLogPrefix + 'Initializing on ' + that.host + ':' + that.port);
+		log.verbose(logPrefix + 'Initializing on ' + that.host + ':' + that.port);
 
 		that.socket.on('error', function (err) {
-			log.error(thisLogPrefix + 'socket error: ' + err.message);
+			log.error(logPrefix + 'socket error: ' + err.message);
 		});
 
 		that.socket.on('close', function (hadError) {
-			log.info(thisLogPrefix + 'socket closed');
+			log.info(logPrefix + 'socket closed');
 			if (hadError) {
-				log.error(thisLogPrefix + 'socket closed with error');
+				log.error(logPrefix + 'socket closed with error');
 			}
 		});
 
 		that.socket.on('end', function () {
-			log.info(thisLogPrefix + 'socket connection ended by remote');
+			log.info(logPrefix + 'socket connection ended by remote');
 		});
 
 		// Create handle by socket connect to rabbitmq
 		tasks.push(function (cb) {
 			bramqp.initialize(that.socket, 'rabbitmq/full/amqp0-9-1.stripped.extended', function (err, result) {
 				if (err) {
-					log.error(thisLogPrefix + 'Error connecting to ' + that.host + ':' + that.port + ' err: ' + err.message);
+					log.error(logPrefix + 'Error connecting to ' + that.host + ':' + that.port + ' err: ' + err.message);
 					that.emit('error', err);
 				}
 
-				log.debug(thisLogPrefix + 'bramqp.initialize() ran on ' + that.host + ':' + that.port);
+				log.debug(logPrefix + 'bramqp.initialize() ran on ' + that.host + ':' + that.port);
 
 				that.handle = result;
 
@@ -98,11 +98,11 @@ function Intercom(conStr) {
 				password	= parsedConStr.auth.split(':')[1];
 			}
 
-			log.debug(thisLogPrefix + 'openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
+			log.debug(logPrefix + 'openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
 
 			that.handle.openAMQPCommunication(username, password, heartBeat, function (err) {
 				if (err) {
-					log.error(thisLogPrefix + 'Error opening AMQP communication: ' + err.message);
+					log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
 					that.emit('error', err);
 				}
 
@@ -118,19 +118,18 @@ function Intercom(conStr) {
 				deliveryTag	= data['delivery-tag'],
 				consumerTag	= data['consumer-tag'];
 
-			log.debug(thisLogPrefix + 'Incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '"');
+			log.debug(logPrefix + 'Incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '"');
 
 			that.handle.once('content', function (channel, className, properties, content) {
 				let	message;
 
-				log.debug(thisLogPrefix + 'Incoming message content. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+				log.debug(logPrefix + 'Incoming message content. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
 
 				try {
 					message = JSON.parse(content.toString());
 				} catch (err) {
 					log.warn(logPrefix + 'subscribe() - Could not parse incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
-					cb(err);
-					return;
+					return cb(err);
 				}
 
 				if (lUtils.formatUuid(message.uuid) === false) {
@@ -147,9 +146,9 @@ function Intercom(conStr) {
 	tasks.push(function (cb) {
 		that.handle.on('connection.close', function (channel, method, data) {
 			if (that.expectingClose === false) {
-				log.error(thisLogPrefix + 'Unexpected connection.close! channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
+				log.error(logPrefix + 'Unexpected connection.close! channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
 			} else {
-				log.info(thisLogPrefix + 'Expected connetion.close. channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
+				log.info(logPrefix + 'Expected connetion.close. channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
 			}
 		});
 		cb();
@@ -163,7 +162,7 @@ function Intercom(conStr) {
 		that.handle.emit = function () {
 			const	emitArgs	= arguments;
 
-			log.silly(logPrefix + 'handle.on("' + arguments[0] + '"), all arguments: "' + JSON.stringify(arguments) + '"');
+			log.silly(topLogPrefix + 'handle.on("' + arguments[0] + '"), all arguments: "' + JSON.stringify(arguments) + '"');
 
 			oldEmitter.apply(that.handle, arguments);
 		}
@@ -219,7 +218,7 @@ function Intercom(conStr) {
 					if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1) {
 						okTimeout = setTimeout(function () {
 							const	err	= new Error('no answer received from queue within 500ms');
-							log.error(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
+							log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
 							callCb = false;
 							cb(err);
 						}, 500);
@@ -230,9 +229,9 @@ function Intercom(conStr) {
 							method	= y;
 							data	= z;
 
-							log.debug(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
+							log.debug(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
 							if (callCb === false) {
-								log.warn(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received but to late; timeout have already happened');
+								log.warn(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received but to late; timeout have already happened');
 								return;
 							}
 							clearTimeout(okTimeout);
@@ -242,13 +241,12 @@ function Intercom(conStr) {
 
 					params.push(function (err) {
 						if (err) {
-							log.error(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+							log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
 							callCb = false;
-							cb(err);
-							return;
+							return cb(err);
 						}
 
-						log.debug(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
+						log.debug(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
 
 						if (cmdStrsWithoutOk.indexOf(cmdStr) !== - 1) {
 							cb();
@@ -270,10 +268,10 @@ function Intercom(conStr) {
 					cb(err, channel, method, data);
 
 					if (that.cmdQueue.length === 0) {
-						log.silly(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" cmdQueue.length === 0');
+						log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" cmdQueue.length === 0');
 						that.cmdInProgress = false;
 					} else {
-						log.silly(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" readFromQueue() rerunning');
+						log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" readFromQueue() rerunning');
 						readFromQueue();
 					}
 				});
@@ -286,9 +284,9 @@ function Intercom(conStr) {
 	async.series(tasks, function (err) {
 		if ( ! err) {
 			if (that.loopback === true) {
-				log.debug(thisLogPrefix + 'Initialized on loopback interface');
+				log.debug(logPrefix + 'Initialized on loopback interface');
 			} else {
-				log.debug(thisLogPrefix + 'Initialized on ' + that.host + ':' + that.port);
+				log.debug(logPrefix + 'Initialized on ' + that.host + ':' + that.port);
 			}
 			that.queueReady	= true;
 			setImmediate(function () {
@@ -309,17 +307,17 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
 		that	= this;
 
-	log.verbose(logPrefix + 'bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchange + '"');
+	log.verbose(topLogPrefix + 'bindQueue() - Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
 	that.ready(function (err) {
-		if (err) { cb(err); return; }
+		if (err) return cb(err);
 
 		that.handle.cmd('queue.bind', [that.channelName, queueName, exchange, 'ignored-routing-key', noWait, args], function (err) {
 			if (err) {
-				log.error(logPrefix + 'bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchange + '", err: ' + err.message);
+				log.error(topLogPrefix + 'bindQueue() - Could not bind queue: "' + queueName + '" to exchange: "' + exchange + '", err: ' + err.message);
 			}
 
-			log.debug(logPrefix + 'bindQueue() - Bound queue "' + queueName + '" to exchange "' + exchange + '"');
+			log.debug(topLogPrefix + 'bindQueue() - Bound queue "' + queueName + '" to exchange "' + exchange + '"');
 
 			cb(err);
 		});
@@ -334,22 +332,21 @@ Intercom.prototype.close = function (cb) {
 		cb = function () {};
 	}
 
-	log.verbose(logPrefix + 'close() - on ' + that.host + ':' + that.port);
+	log.verbose(topLogPrefix + 'close() - on ' + that.host + ':' + that.port);
 
 	that.expectingClose = true;
 
 	that.ready(function (err) {
-		if (err) { cb(err); return; }
+		if (err) return cb(err);
 
 		that.handle.cmd('closeAMQPCommunication', function (err) {
 			if (err) {
-				log.warn(logPrefix + 'close() - Could not closeAMQPCommunication: ' + err.message);
-				cb(err);
-				return;
+				log.warn(topLogPrefix + 'close() - Could not closeAMQPCommunication: ' + err.message);
+				return cb(err);
 			}
 
 			setImmediate(function () {
-				log.debug(logPrefix + 'close() - closed ' + that.host + ':' + that.port);
+				log.debug(topLogPrefix + 'close() - closed ' + that.host + ':' + that.port);
 				cb();
 			});
 		});
@@ -373,7 +370,7 @@ Intercom.prototype.consume = function (options, msgCb, cb) {
 		options.exchange	= 'default';
 	}
 
-	log.verbose(logPrefix + 'consume() - Starting on exchange "' + options.exchange + '"');
+	log.verbose(topLogPrefix + 'consume() - Starting on exchange "' + options.exchange + '"');
 
 	this.genericConsume(options, msgCb, cb);
 };
@@ -390,27 +387,25 @@ Intercom.prototype.declareExchange = function (exchangeName, cb) {
 		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.arguments
 		that	= this;
 
-	log.debug(logPrefix + 'declareExchange() - exchangeName: "' + exchangeName + '"');
+	log.debug(topLogPrefix + 'declareExchange() - exchangeName: "' + exchangeName + '"');
 
 	that.ready(function (err) {
-		if (err) { cb(err); return; }
+		if (err) return cb(err);
 
 		if (that.declaredExchanges.indexOf(exchangeName) !== - 1) {
-			log.debug(logPrefix + 'declareExchange() - Already declared. exchangeName: "' + exchangeName + '"');
-			cb();
-			return;
+			log.debug(topLogPrefix + 'declareExchange() - Already declared. exchangeName: "' + exchangeName + '"');
+			return cb();
 		}
 
-		log.verbose(logPrefix + 'declareExchange() - Declaring exchangeName: "' + exchangeName + '"');
+		log.verbose(topLogPrefix + 'declareExchange() - Declaring exchangeName: "' + exchangeName + '"');
 
 		that.handle.cmd('exchange.declare', [that.channelName, exchangeName, exchangeType, passive, durable, autoDelete, internal, noWait, args], function (err) {
 			if (err) {
-				log.warn(logPrefix + 'declareExchange() - Could not declare exchange "' + exchangeName + '", err: ' + err.message);
-				cb(err);
-				return;
+				log.warn(topLogPrefix + 'declareExchange() - Could not declare exchange "' + exchangeName + '", err: ' + err.message);
+				return cb(err);
 			}
 
-			log.debug(logPrefix + 'declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
+			log.debug(topLogPrefix + 'declareExchange() - Declared! exchangeName: "' + exchangeName + '"');
 
 			that.declaredExchanges.push(exchangeName);
 			cb(err);
@@ -440,22 +435,21 @@ Intercom.prototype.declareQueue = function (options, cb) {
 	if ( ! options.queueName)	{ options.queueName	= '';	}
 	if (options.exclusive === undefined)	{ options.exclusive	= false;	}
 
-	log.verbose(logPrefix + 'declareQueue() - Declaring queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
+	log.verbose(topLogPrefix + 'declareQueue() - Declaring queueName: "' + options.queueName + '" exclusive: ' + options.exclusive.toString());
 
 	that.ready(function (err) {
-		if (err) { cb(err); return; }
+		if (err) return cb(err);
 
 		that.handle.cmd('queue.declare', [that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args], function (err, channel, method, data) {
 			let queueName;
 
 			if (err) {
-				log.error(logPrefix + 'declareQueue() - Could not declare queue, name: "' + options.queueName + '" err: ' + err.message);
-				cb(err);
-				return;
+				log.error(topLogPrefix + 'declareQueue() - Could not declare queue, name: "' + options.queueName + '" err: ' + err.message);
+				return cb(err);
 			}
 
 			queueName = data.queue;
-			log.debug(logPrefix + 'declareQueue() - Declared! queueName: "' + queueName + '" exclusive: ' + options.exclusive.toString());
+			log.debug(topLogPrefix + 'declareQueue() - Declared! queueName: "' + queueName + '" exclusive: ' + options.exclusive.toString());
 			cb(err, queueName);
 		});
 	});
@@ -480,7 +474,7 @@ Intercom.prototype.deleteQueue = function (queueName, cb) {
 
 	that.handle.queue.delete(that.channelName, queueName, ifUnused, ifEmpty, noWait);
 	that.handle.once(that.channelName + ':queue.delete-ok', function (channel, method, data) {
-		log.verobse(logPrefix + 'deleteQueue() - queue "' + queueName + '", containing "' + data['message-count'] + '" deleted.');
+		log.verobse(topLogPrefix + 'deleteQueue() - queue "' + queueName + '", containing "' + data['message-count'] + '" deleted.');
 		cb();
 	});
 };*/
@@ -514,26 +508,26 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 		if (returnObj.data === undefined || returnObj.data['consumer-tag'] === undefined) {
 			const	err = new Error('No consumer tag is defined, consume have probably not been started yet.');
-			log.warn(logPrefix + 'genericConsume() - cancel() - ' + err.message);
+			log.warn(topLogPrefix + 'genericConsume() - cancel() - ' + err.message);
 			cb(err);
 			return;
 		}
 
 		that.handle.basic.cancel(returnObj.data['consumer-tag'], function (err) {
 			if (err) {
-				log.warn(logPrefix + 'genericConsume() - cancel() - Could not canceled consuming. consumer-tag: "' + returnObj.data['consumer-tag'] + '", err: ' + err.message);
+				log.warn(topLogPrefix + 'genericConsume() - cancel() - Could not canceled consuming. consumer-tag: "' + returnObj.data['consumer-tag'] + '", err: ' + err.message);
 			} else {
-				log.verbose(logPrefix + 'genericConsume() - cancel() - Canceled consuming. consumer-tag: "' + returnObj.data['consumer-tag'] + '"');
+				log.verbose(topLogPrefix + 'genericConsume() - cancel() - Canceled consuming. consumer-tag: "' + returnObj.data['consumer-tag'] + '"');
 			}
 
 			cb(err);
 		});
 		// We could not get this to work :( // Lilleman and gagge 2016-12-27
 		//that.handle.once(that.channelName + ':basic.cancel-ok', function (channel, method, data) {
-		//	log.verbose(logPrefix + 'consume() - cancel() - Canceled consuming.');
-		//	log.debug(logPrefix + 'consume() - cancel() - Canceled consuming. channel: ' + JSON.stringify(channel));
-		//	log.debug(logPrefix + 'consume() - cancel() - Canceled consuming. method: ' + JSON.stringify(method));
-		//	log.debug(logPrefix + 'consume() - cancel() - Canceled consuming. data: ' + JSON.stringify(data));
+		//	log.verbose(topLogPrefix + 'consume() - cancel() - Canceled consuming.');
+		//	log.debug(topLogPrefix + 'consume() - cancel() - Canceled consuming. channel: ' + JSON.stringify(channel));
+		//	log.debug(topLogPrefix + 'consume() - cancel() - Canceled consuming. method: ' + JSON.stringify(method));
+		//	log.debug(topLogPrefix + 'consume() - cancel() - Canceled consuming. data: ' + JSON.stringify(data));
 		//	cb();
 		//});
 	};*/
@@ -553,7 +547,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 				cb(err);
 			});
 		} else {
-			log.error(logPrefix + 'genericConsume() - Options.type must be "consume" or "subscribe", but is: "' + options.type + '"');
+			log.error(topLogPrefix + 'genericConsume() - Options.type must be "consume" or "subscribe", but is: "' + options.type + '"');
 		}
 	});
 
@@ -581,7 +575,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function (err, channel, method, data) {
 			let	consumerTag;
 
-			if (err) { cb(err); return; }
+			if (err) return cb(err);
 
 			returnObj.channel	= channel;
 			returnObj.method	= method;
@@ -590,10 +584,10 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 			if (data !== undefined && data['consumer-tag'] !== undefined) {
 				consumerTag = data['conumer-tag'];
 			} else {
-				log.warn(logPrefix + 'genericConsume() - No consumerTag obtained for queue: "' + queueName + '"');
+				log.warn(topLogPrefix + 'genericConsume() - No consumerTag obtained for queue: "' + queueName + '"');
 			}
 
-			log.verbose(logPrefix + 'genericConsume() - Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
+			log.verbose(topLogPrefix + 'genericConsume() - Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
 			cb();
 		});
 	});
@@ -604,18 +598,17 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 		if (that.listenerCount(eventName) !== 0) {
 			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
-			log.warn(logPrefix + 'genericConsume() - ' + err.message);
-			cb(err);
-			return;
+			log.warn(topLogPrefix + 'genericConsume() - ' + err.message);
+			return cb(err);
 		}
 
 		that.on(eventName, function (message, deliveryTag) {
 			msgCb(message, function (err) {
 				if (err) {
-					log.warn(logPrefix + 'genericConsume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
+					log.warn(topLogPrefix + 'genericConsume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
 					that.handle.cmd('basic.nack', [that.channelName, deliveryTag]);
 				} else {
-					log.debug(logPrefix + 'genericConsume() - ack on deliveryTag: "' + deliveryTag + '"');
+					log.debug(topLogPrefix + 'genericConsume() - ack on deliveryTag: "' + deliveryTag + '"');
 					that.handle.cmd('basic.nack', [that.channelName, deliveryTag]);
 				}
 			}, deliveryTag);
@@ -625,17 +618,14 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	});
 
 	async.series(tasks, function (err) {
-		if (err) { cb(err); return; }
+		if (err) return cb(err);
 
 		cb(err, returnObj);
 	});
 };
 
 Intercom.prototype.ready = function (cb) {
-	if (this.queueReady === true) {
-		cb();
-		return;
-	}
+	if (this.queueReady === true) return cb();
 
 	this.on('ready', cb);
 };
@@ -680,13 +670,12 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 
 		stringifiedMsg = JSON.stringify(message);
 	} catch (err) {
-		log.warn(logPrefix + 'send() - Could not stringify message. Message attached to next log call.');
-		log.warn(logPrefix + 'send() - Unstringifiable message attached:', message);
-		cb(err);
-		return;
+		log.warn(topLogPrefix + 'send() - Could not stringify message. Message attached to next log call.');
+		log.warn(topLogPrefix + 'send() - Unstringifiable message attached:', message);
+		return cb(err);
 	}
 
-	log.debug(logPrefix + 'send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
+	log.debug(topLogPrefix + 'send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
 
 	// Declare exchange
 	tasks.push(function (cb) {
@@ -715,7 +704,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 
 		that.handle.cmd('basic.publish', [that.channelName, options.exchange, 'ignored-routing-key', mandatory, immediate], function (err) {
 			if (err) {
-				log.warn(logPrefix + 'send() - readFromQueue() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+				log.warn(topLogPrefix + 'send() - readFromQueue() - Could not publish to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 				if ( ! cbErr) {
 					cbErr	= err;
 					cb(err);
@@ -723,7 +712,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 				return;
 			}
 
-			log.debug(logPrefix + 'send() - readFromQueue() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+			log.debug(topLogPrefix + 'send() - readFromQueue() - Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
 			cbsRan ++;
 			if (cbsRan === 2 && ! cbErr) {
@@ -733,7 +722,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 
 		that.handle.cmd('content', [that.channelName, className, properties, stringifiedMsg], function (err) {
 			if (err) {
-				log.warn(logPrefix + 'send() - readFromQueue() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+				log.warn(topLogPrefix + 'send() - readFromQueue() - Could not send publish content to exchange: "' + options.exchange + '". err: ' + err.message + ', uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 				if ( ! cbErr) {
 					cbErr	= err;
 					cb(err);
@@ -741,7 +730,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 				return;
 			}
 
-			log.debug(logPrefix + 'send() - readFromQueue() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
+			log.debug(topLogPrefix + 'send() - readFromQueue() - Content sent to exchange: "' + options.exchange + '", uuid: "' + message.uuid + ', message: "' + stringifiedMsg + '"');
 
 			cbsRan ++;
 			if (cbsRan === 2 && ! cbErr) {
@@ -768,7 +757,7 @@ Intercom.prototype.subscribe = function (options, msgCb, cb) {
 		options.exchange	= 'default';
 	}
 
-	log.verbose(logPrefix + 'subscribe() - Starting on exchange "' + options.exchange + '"');
+	log.verbose(topLogPrefix + 'subscribe() - Starting on exchange "' + options.exchange + '"');
 
 	this.genericConsume(options, msgCb, cb);
 };
