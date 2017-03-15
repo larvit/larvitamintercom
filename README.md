@@ -18,7 +18,7 @@ const	Intercom	= require('larvitamintercom'),
 let	message	= {'hello':	'world'},
 	options	= {'exchange':	'foo'}; // Will default to "default" if options is omitted
 
-intercom.send(message, options, function(err, msgUuid) {
+intercom.send(message, options, function (err, msgUuid) {
 	// called when message is accepted by queue handler
 	// msgUuid will be a unique UUID for this specific message
 });
@@ -56,7 +56,7 @@ const	Intercom	= require('larvitamintercom'),
 
 let	options = {'exchange': 'foo'}; // Will default to "default" if options is omitted
 
-intercom.consume(options, function(message, ack, deliveryTag) {
+intercom.consume(options, function (message, ack, deliveryTag) {
 	// message being the object sent with intercom.send()
 
 	// deliveryTag is an identification of this delivery
@@ -65,7 +65,7 @@ intercom.consume(options, function(message, ack, deliveryTag) {
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err) {
+}, function (err) {
 	// Callback from established consume connection
 });
 ```
@@ -87,7 +87,7 @@ const	Intercom	= require('larvitamintercom').Intercom,
 
 let options = {'exchange': 'default'};
 
-intercom.subscribe(options, function(message, ack, deliveryTag) {
+intercom.subscribe(options, function (message, ack, deliveryTag) {
 	// message subscribe the object sent with intercom.send()
 
 	// deliveryTag is an identification of this delivery
@@ -96,7 +96,7 @@ intercom.subscribe(options, function(message, ack, deliveryTag) {
 	ack();
 	// or
 	ack(new Error('Something was wrong with the message'));
-}, function(err, subscribeInstance) {
+}, function (err, subscribeInstance) {
 	// Callback from established subscribe connection
 });
 ```
