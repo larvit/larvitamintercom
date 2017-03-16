@@ -39,6 +39,7 @@ function Intercom(conStr) {
 
 	if (conStr === 'loopback interface') {
 		that.loopback	= true;
+		that.loopbackConQueue	= {};
 		that.handle	= new EventEmitter;
 
 		log.verbose(logPrefix + 'Initializing on loopback interface');
@@ -229,6 +230,10 @@ function Intercom(conStr) {
 						}
 					}
 
+					if (that.loopback === true) {
+						return cb();
+					}
+
 					if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1 && that.loopback === false) {
 						okTimeout = setTimeout(function () {
 							const	err	= new Error('no answer received from queue within 500ms');
@@ -359,6 +364,8 @@ Intercom.prototype.close = function (cb) {
 };
 
 Intercom.prototype.consume = function (options, msgCb, cb) {
+	const	that	= this;
+
 	if (typeof options === 'function') {
 		cb	= msgCb;
 		msgCb	= options;
@@ -373,6 +380,22 @@ Intercom.prototype.consume = function (options, msgCb, cb) {
 
 	if (options.exchange === undefined) {
 		options.exchange	= 'default';
+	}
+
+	if (that.loopback === true) {
+		if (Array.isArray(that.loopbackConQueue[options.exchange])) {
+			setTimeout(function () {
+				for (let i = 0; that.loopbackConQueue[options.exchange][i] !== undefined; i ++) {
+					const	queueItem	= that.loopbackConQueue[options.exchange][i];
+
+					queueItem.options.ignoreConQueue = true;
+
+					that.send(queueItem.orgMsg, queueItem.options);
+				}
+
+				that.loopbackConQueue[options.exchange] = 'connected';
+			}, 10);
+		}
 	}
 
 	log.verbose(topLogPrefix + 'consume() - Starting on exchange "' + options.exchange + '"');
@@ -490,6 +513,7 @@ Intercom.prototype.deleteQueue = function (queueName, cb) {
 
 Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	const	returnObj	= {},
+		logPrefix	= topLogPrefix + 'Intercom.prototype.genericConsume() - ',
 		tasks	= [],
 		that	= this;
 
@@ -556,7 +580,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 				cb(err);
 			});
 		} else {
-			log.error(topLogPrefix + 'genericConsume() - Options.type must be "consume" or "subscribe", but is: "' + options.type + '"');
+			log.error(logPrefix + 'Options.type must be "consume" or "subscribe", but is: "' + options.type + '"');
 		}
 	});
 
@@ -596,10 +620,10 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 			if (data !== undefined && data['consumer-tag'] !== undefined) {
 				consumerTag = data['conumer-tag'];
 			} else {
-				log.warn(topLogPrefix + 'genericConsume() - No consumerTag obtained for queue: "' + queueName + '"');
+				log.warn(logPrefix + 'No consumerTag obtained for queue: "' + queueName + '"');
 			}
 
-			log.verbose(topLogPrefix + 'genericConsume() - Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
+			log.verbose(logPrefix + 'Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
 			cb();
 		});
 	});
@@ -607,13 +631,6 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	// Register msgCb
 	tasks.push(function (cb) {
 		const	eventName	= 'incoming_msg_' + options.exchange;
-
-		// No need to send a command on the queue for the loopback, handle this directly in the send function
-		if (that.loopback === true) {
-----			msbCb()
-			return cb();
-		}
-
 
 		if (that.listenerCount(eventName) !== 0) {
 			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
@@ -624,10 +641,10 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 		that.on(eventName, function (message, deliveryTag) {
 			msgCb(message, function (err) {
 				if (err) {
-					log.warn(topLogPrefix + 'genericConsume() - nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
+					log.warn(logPrefix + 'nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
 					that.handle.cmd('basic.nack', [that.channelName, deliveryTag]);
 				} else {
-					log.debug(topLogPrefix + 'genericConsume() - ack on deliveryTag: "' + deliveryTag + '"');
+					log.debug(logPrefix + 'ack on deliveryTag: "' + deliveryTag + '"');
 					that.handle.cmd('basic.nack', [that.channelName, deliveryTag]);
 				}
 			}, deliveryTag);
@@ -697,7 +714,20 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 	log.debug(topLogPrefix + 'send() - readFromQueue() - Sending to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
 
 	if (that.loopback === true) {
-		that.emit('incoming_msg_' + options.exchange, stringifiedMsg, uuidLib.v4());
+		if (
+				options.forceConsumeQueue	=== true
+			&&	that.loopbackConQueue[options.exchange]	!== 'connected'
+			&&	options.ignoreConQueue	!== true
+		) {
+			if (that.loopbackConQueue[options.exchange] === undefined) {
+				that.loopbackConQueue[options.exchange] = [];
+			}
+
+			that.loopbackConQueue[options.exchange].push({'orgMsg': orgMsg, 'options': options});
+			return cb();
+		}
+
+		that.emit('incoming_msg_' + options.exchange, message, uuidLib.v4());
 		return cb();
 	}
 

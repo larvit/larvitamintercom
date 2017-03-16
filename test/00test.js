@@ -96,6 +96,7 @@ before(function (done) {
 });*/
 
 describe('Send and receive', function () {
+
 	describe('network connection', function () {
 		it('check so the first intercom is up', function (done) {
 			const	intercom	= intercoms[0];
@@ -119,7 +120,7 @@ describe('Send and receive', function () {
 				intercom.consume(function (msg, ack, deliveryTag) {
 					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
 					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 					assert(deliveryTag, 'deliveryTag should be non-empty');
 					consumed ++;
 					ack();
@@ -130,7 +131,7 @@ describe('Send and receive', function () {
 				intercom.subscribe(function (msg, ack, deliveryTag) {
 					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
 					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 					assert(deliveryTag, 'deliveryTag should be non-empty');
 					subscribed ++;
 					ack();
@@ -151,8 +152,8 @@ describe('Send and receive', function () {
 					// Wait for a while to make sure consume() is not ran multiple times.
 					// This is not pretty, but I can not think of a better way
 					setTimeout(function () {
-						assert.deepEqual(consumed,	1);
-						assert.deepEqual(subscribed,	2);
+						assert.deepStrictEqual(consumed,	1);
+						assert.deepStrictEqual(subscribed,	2);
 						done();
 					}, 1000);
 				});
@@ -174,7 +175,7 @@ describe('Send and receive', function () {
 				intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
 					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 					assert(deliveryTag, 'deliveryTag shoult be non-empty');
 					consumed ++;
 					ack();
@@ -185,7 +186,7 @@ describe('Send and receive', function () {
 				intercom.subscribe({'exchange': exchange}, function (msg, ack, deliveryTag) {
 					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 					assert(deliveryTag, 'deliveryTag shoult be non-empty');
 					subscribed ++;
 					ack();
@@ -206,8 +207,8 @@ describe('Send and receive', function () {
 					// Wait for a while to make sure consume() is not ran multiple times.
 					// This is not pretty, but I can not think of a better way
 					setTimeout(function () {
-						assert.deepEqual(consumed,	1);
-						assert.deepEqual(subscribed,	2);
+						assert.deepStrictEqual(consumed,	1);
+						assert.deepStrictEqual(subscribed,	2);
 						done();
 					}, 1000);
 				});
@@ -226,7 +227,7 @@ describe('Send and receive', function () {
 					intercom[method][method]({'exchange': exchange}, function (msg, ack, deliveryTag) {
 						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 						delete msg.uuid;
-						assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 						assert(deliveryTag, 'deliveryTag shoult be non-empty');
 						ack();
 						cb();
@@ -350,7 +351,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercoms[0].subscribe({'exchange': exchange1}, function (msg, ack) {
-					assert.deepEqual(msg.bar, orgMsg1.bar);
+					assert.deepStrictEqual(msg.bar, orgMsg1.bar);
 					receivedMsg1 ++;
 					ack();
 				}, cb);
@@ -358,7 +359,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercoms[0].subscribe({'exchange': exchange2}, function (msg, ack) {
-					assert.deepEqual(msg.waffer, orgMsg2.waffer);
+					assert.deepStrictEqual(msg.waffer, orgMsg2.waffer);
 					receivedMsg2 ++;
 					ack();
 				}, cb);
@@ -400,7 +401,7 @@ describe('Send and receive', function () {
 					intercoms[0].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
 						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 						delete msg.uuid;
-						assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 						assert(deliveryTag, 'deliveryTag shoult be non-empty');
 						ack();
 						done();
@@ -453,197 +454,106 @@ describe('Send and receive', function () {
 			});
 		});
 	});
-/*
+
 	describe('loopback interface', function () {
-		const	loIntercom	= new Intercom('loopback interface');
+		it('send and receive a message to the default exchange via consume', function (done) {
+			const	intercom	= new Intercom('loopback interface'),
+				orgMsg	= {'fooconsume': 'barconsume'};
 
-		it('send and receive a message to the default exchange', function (done) {
-			const	intercom	= loIntercom,
-				orgMsg	= {'foo': 'bar'},
-				tasks	= [];
-
-			this.timeout(2500);
-			this.slow(2100); // > 1050 is shown in yellow, 1000ms is setTimeout()
-
-			let	subscribed	= 0,
-				consumed	= 0;
-
-			function consume(cb) {
-				intercom.consume(function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
-					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag should be non-empty');
-					consumed ++;
-					ack();
-				}, cb);
-			}
-
-			function subscribe(cb) {
-				intercom.subscribe(function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
-					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag should be non-empty');
-					subscribed ++;
-					ack();
-				}, cb);
-			}
-
-			tasks.push(function (cb) { consume(cb);	});
-			tasks.push(function (cb) { subscribe(cb);	});
-			tasks.push(function (cb) { subscribe(cb);	});
-
-			async.parallel(tasks, function (err) {
+			intercom.consume(function (msg, ack, deliveryTag) {
+				assert.notStrictEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				delete msg.uuid;
+				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+				assert(deliveryTag, 'deliveryTag should be non-empty');
+				ack();
+				done();
+			}, function (err) {
 				if (err) throw err;
+			});
 
-				intercom.send(orgMsg, function (err) {
-					if (err) throw err;
-
-					// Wait for a while to make sure consume() is not ran multiple times.
-					// This is not pretty, but I can not think of a better way
-					setTimeout(function () {
-						assert.deepEqual(consumed,	1);
-						assert.deepEqual(subscribed,	2);
-						done();
-					}, 1000);
-				});
+			intercom.send(orgMsg, function (err) {
+				if (err) throw err;
 			});
 		});
 
-		it('send and receive a message to a custom exchange', function (done) {
-			const	intercom	= loIntercom,
-				exchange	= 'customeOne',
-				orgMsg	= {'foo': 'bard'},
-				tasks	= [];
+		it('send and receive a message to the default exchange via subscribe', function (done) {
+			const	intercom	= new Intercom('loopback interface'),
+				orgMsg	= {'foosubscribe': 'barsubscribe'};
 
-			this.timeout(2500);
-			this.slow(2100); // > 1050 is shown in yellow, 1000ms is setTimeout()
-
-			let	subscribed	= 0,
-				consumed	= 0;
-
-			function consume(cb) {
-				intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
-					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag shoult be non-empty');
-					consumed ++;
-					ack();
-				}, cb);
-			}
-
-			function subscribe(cb) {
-				intercom.subscribe({'exchange': exchange}, function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
-					delete msg.uuid;
-					assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag shoult be non-empty');
-					subscribed ++;
-					ack();
-				}, cb);
-			}
-
-			tasks.push(function (cb) { consume(cb);	});
-			tasks.push(function (cb) { consume(cb);	});
-			tasks.push(function (cb) { subscribe(cb);	});
-			tasks.push(function (cb) { subscribe(cb);	});
-
-			async.parallel(tasks, function (err) {
+			intercom.subscribe(function (msg, ack, deliveryTag) {
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				delete msg.uuid;
+				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+				assert(deliveryTag, 'deliveryTag should be non-empty');
+				ack();
+				done();
+			}, function (err) {
 				if (err) throw err;
+			});
 
-				intercom.send(orgMsg, {'exchange': exchange}, function (err) {
-					if (err) throw err;
-
-					// Wait for a while to make sure consume() is not ran multiple times.
-					// This is not pretty, but I can not think of a better way
-					setTimeout(function () {
-						assert.deepEqual(consumed,	1);
-						assert.deepEqual(subscribed,	2);
-						done();
-					}, 1000);
-				});
+			intercom.send(orgMsg, function (err) {
+				if (err) throw err;
 			});
 		});
 
-		it('send and receive on the same Intercom', function (done) {
-			const	intercom	= {'subscribe': loIntercom, 'consume': loIntercom},
-				tasks	= [];
+		it('send and receive a message to a custom exchange via consume', function (done) {
+			const	intercom	= new Intercom('loopback interface'),
+				exchange	= 'loopbackExchCon',
+				orgMsg	= {'fooconcusExch': 'barconcusExch'};
 
-			for (const method of Object.keys(intercom)) {
-				tasks.push(function (cb) {
-					const	exchange	= 'sameInstance' + method,
-						orgMsg	= {'bi': 'bu'};
+			intercom.consume({'exchange': exchange + '_nope'}, function () {
+				throw new Error('should not receive any messages here');
+			}, function (err) {
+				if (err) throw err;
+			});
 
-					intercom[method][method]({'exchange': exchange}, function (msg, ack, deliveryTag) {
-						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
-						delete msg.uuid;
-						assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-						assert(deliveryTag, 'deliveryTag shoult be non-empty');
-						ack();
-						cb();
-					}, function (err) {
-						if (err) throw err;
+			intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
+				assert.notStrictEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				delete msg.uuid;
+				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+				assert(deliveryTag, 'deliveryTag should be non-empty');
+				ack();
+				setTimeout(done, 20);
+			}, function (err) {
+				if (err) throw err;
+			});
 
-						intercom[method].send(orgMsg, {'exchange': exchange}, function (err) {
-							if (err) throw err;
-						});
-					});
-				});
-			}
-
-			async.parallel(tasks, done);
+			intercom.send(orgMsg, {'exchange': exchange}, function (err) {
+				if (err) throw err;
+			});
 		});
 
-		it('send and receive multiple messages on the same Intercom', function (done) {
-			const	intercom	= {'subscribe': loIntercom, 'consume': loIntercom},
-				tasks	= [];
+		it('send and receive a message to a custom exchange via subscribe', function (done) {
+			const	intercom	= new Intercom('loopback interface'),
+				exchange	= 'loopbackExchSub',
+				orgMsg	= {'foosubExch': 'barsubExch'};
 
-			for (const method of Object.keys(intercom)) {
-				tasks.push(function (cb) {
-					const	exchange	= 'yetAnotherInstance' + method,
-						orgMsg1	= {'bar': 'bor'},
-						orgMsg2	= {'waffer': 'woffer'};
+			intercom.subscribe({'exchange': exchange + '_nope'}, function () {
+				throw new Error('should not receive any messages here');
+			}, function (err) {
+				if (err) throw err;
+			});
 
-					let	msg1Received = 0,
-						msg2Received = 0;
+			intercom.subscribe({'exchange': exchange}, function (msg, ack, deliveryTag) {
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				delete msg.uuid;
+				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+				assert(deliveryTag, 'deliveryTag should be non-empty');
+				ack();
+				setTimeout(done, 20);
+			}, function (err) {
+				if (err) throw err;
+			});
 
-					intercom[method][method]({'exchange': exchange}, function (msg, ack) {
-						if (JSON.stringify(msg.bar) === JSON.stringify(orgMsg1.bar)) {
-							msg1Received ++;
-							ack();
-						} else if (JSON.stringify(msg.waffer) === JSON.stringify(orgMsg2.waffer)) {
-							msg2Received ++;
-							ack();
-						}
-
-						if (msg1Received === 10 && msg2Received === 10) {
-							cb();
-						}
-					}, function (err) {
-						if (err) throw err;
-
-						for (let i = 0; i !== 10; i ++) {
-							intercom[method].send(orgMsg1, {'exchange': exchange}, function (err) {
-								if (err) throw err;
-							});
-
-							intercom[method].send(orgMsg2, {'exchange': exchange}, function (err) {
-								if (err) throw err;
-							});
-						}
-					});
-				});
-			}
-
-			async.parallel(tasks, done);
+			intercom.send(orgMsg, {'exchange': exchange}, function (err) {
+				if (err) throw err;
+			});
 		});
 
 		it('send and receive messages on different exchanges', function (done) {
 			const	exchange1	= 'differentExes1',
 				exchange2	= 'differentExes2',
-				intercom	= loIntercom,
+				intercom	= new Intercom('loopback interface'),
 				orgMsg1	= {'bar': 'bor'},
 				orgMsg2	= {'waffer': 'woffer'},
 				tasks	= [];
@@ -653,7 +563,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercom.subscribe({'exchange': exchange1}, function (msg, ack) {
-					assert.deepEqual(msg.bar, orgMsg1.bar);
+					assert.deepStrictEqual(msg.bar, orgMsg1.bar);
 					receivedMsg1 ++;
 					ack();
 				}, cb);
@@ -661,7 +571,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercom.subscribe({'exchange': exchange2}, function (msg, ack) {
-					assert.deepEqual(msg.waffer, orgMsg2.waffer);
+					assert.deepStrictEqual(msg.waffer, orgMsg2.waffer);
 					receivedMsg2 ++;
 					ack();
 				}, cb);
@@ -689,74 +599,103 @@ describe('Send and receive', function () {
 			});
 		});
 
+		it('send 1000 messages on subscription', function (done) {
+			const	intercom	= new Intercom('loopback interface');
+
+			let	receivedMsgs	= 0,
+				expectedSum	= 0,
+				actualSum	= 0;
+
+			intercom.subscribe(function (msg, ack, deliveryTag) {
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+
+				actualSum += msg.thisNr;
+				receivedMsgs	++;
+
+				assert(deliveryTag, 'deliveryTag should be non-empty');
+				ack();
+
+				if (receivedMsgs === 1000) {
+					assert.strictEqual(expectedSum, actualSum);
+					done();
+				}
+			}, function (err) {
+				if (err) throw err;
+			});
+
+			for (let i = 0; i !== 1000; i ++) {
+				const	thisNr	= Math.round(Math.random());
+
+				expectedSum	+= thisNr;
+
+				intercom.send({'thisNr': thisNr}, function (err) {
+					if (err) throw err;
+				});
+			}
+		});
+
+		it('send 1000 messages on consume', function (done) {
+			const	intercom	= new Intercom('loopback interface');
+
+			let	receivedMsgs	= 0,
+				expectedSum	= 0,
+				actualSum	= 0;
+
+			intercom.consume(function (msg, ack, deliveryTag) {
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+
+				actualSum += msg.thisNr;
+				receivedMsgs	++;
+
+				assert(deliveryTag, 'deliveryTag should be non-empty');
+				ack();
+
+				if (receivedMsgs === 1000) {
+					assert.strictEqual(expectedSum, actualSum);
+					done();
+				}
+			}, function (err) {
+				if (err) throw err;
+			});
+
+			for (let i = 0; i !== 1000; i ++) {
+				const	thisNr	= Math.round(Math.random());
+
+				expectedSum	+= thisNr;
+
+				intercom.send({'thisNr': thisNr}, function (err) {
+					if (err) throw err;
+				});
+			}
+		});
+
 		it('send before consumer is up and still receive', function (done) {
-			const	exchange	= 'dkfia893M', // Random exchange to not collide with another test
+			const	intercom	= new Intercom('loopback interface'),
+				exchange	= 'dkfia893M', // Random exchange to not collide with another test
 				orgMsg	= {'foo': 'bar'};
 
 			this.timeout(2000);
 			this.slow(700);
 
-			loIntercom.send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function (err) {
+			intercom.send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function (err) {
 				if (err) throw err;
 
 				setTimeout(function () {
-					loIntercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
+					intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
 						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 						delete msg.uuid;
-						assert.deepEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
+						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
 						assert(deliveryTag, 'deliveryTag shoult be non-empty');
 						ack();
 						done();
 					}, function (err) {
 						if (err) throw err;
-
 					});
 				}, 200);
 			});
 		});
-
-		it('send and declare exchanges at the same time', function (done) {
-			const	exchange	= 'breakCmdChain',
-				intercom	= loIntercom,
-				orgMsg1	= {'blippel': 'bloppel'},
-				orgMsg2	= {'maffab': 'berk'};
-
-			let	msg1Received	= 0,
-				msg2Received	= 0;
-
-			intercom.subscribe({'exchange': exchange}, function (msg, ack) {
-				if (JSON.stringify(msg.blippel) === JSON.stringify(orgMsg1.blippel)) {
-					msg1Received ++;
-					ack();
-				} else if (JSON.stringify(msg.maffab) === JSON.stringify(orgMsg2.maffab)) {
-					msg2Received ++;
-					ack();
-				}
-
-				if (msg1Received === 10 && msg2Received === 10) {
-					done();
-				}
-			}, function (err) {
-				if (err) throw err;
-
-				for (let i = 0; i !== 10; i ++) {
-					intercom.send(orgMsg1, {'exchange': exchange}, function (err) {
-						if (err) throw err;
-					});
-
-					// Lets provoke!
-					intercom.declareExchange(exchange + '_foobar', function (err) {
-						if (err) throw err;
-					});
-
-					intercom.send(orgMsg2, {'exchange': exchange}, function (err) {
-						if (err) throw err;
-					});
-				}
-			});
-		});
 	});
-*/
+
 	/* Disabled until .cancel() is fixed
 	it('should not receive after the consumation is cancelled', function (done) {
 		const	consumeIntercom	= intercoms[14],
@@ -813,8 +752,8 @@ describe('Send and receive', function () {
 
 				// Wait a while, and then make sure we have not gotten a second message
 				setTimeout(function () {
-					assert.deepEqual(receivedNoMsgs,	1);
-					assert.deepEqual(receivedYesMsgs,	2);
+					assert.deepStrictEqual(receivedNoMsgs,	1);
+					assert.deepStrictEqual(receivedYesMsgs,	2);
 					done();
 				}, 200);
 			});
@@ -879,8 +818,8 @@ describe('Send and receive', function () {
 
 				// Wait a while, and then make sure we have not gotten a second message
 				setTimeout(function () {
-					assert.deepEqual(receivedNoMsgs,	1);
-					assert.deepEqual(receivedYesMsgs,	2);
+					assert.deepStrictEqual(receivedNoMsgs,	1);
+					assert.deepStrictEqual(receivedYesMsgs,	2);
 					done();
 				}, 200);
 			});
