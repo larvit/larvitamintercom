@@ -471,7 +471,9 @@ describe('Send and receive', function () {
 				if (err) throw err;
 			});
 
-			intercom.send(orgMsg, function (err) {
+			intercom.send(orgMsg, function (err, msgUuid) {
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+
 				if (err) throw err;
 			});
 		});
@@ -491,7 +493,9 @@ describe('Send and receive', function () {
 				if (err) throw err;
 			});
 
-			intercom.send(orgMsg, function (err) {
+			intercom.send(orgMsg, function (err, msgUuid) {
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+
 				if (err) throw err;
 			});
 		});
@@ -518,7 +522,9 @@ describe('Send and receive', function () {
 				if (err) throw err;
 			});
 
-			intercom.send(orgMsg, {'exchange': exchange}, function (err) {
+			intercom.send(orgMsg, {'exchange': exchange}, function (err, msgUuid) {
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+
 				if (err) throw err;
 			});
 		});
@@ -545,7 +551,9 @@ describe('Send and receive', function () {
 				if (err) throw err;
 			});
 
-			intercom.send(orgMsg, {'exchange': exchange}, function (err) {
+			intercom.send(orgMsg, {'exchange': exchange}, function (err, msgUuid) {
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+
 				if (err) throw err;
 			});
 		});
@@ -578,11 +586,19 @@ describe('Send and receive', function () {
 			});
 
 			tasks.push(function (cb) {
-				intercom.send(orgMsg1, {'exchange': exchange1}, cb);
+				intercom.send(orgMsg1, {'exchange': exchange1}, function (err, msgUuid) {
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+					if (err) throw err;
+					cb(err);
+				});
 			});
 
 			tasks.push(function (cb) {
-				intercom.send(orgMsg2, {'exchange': exchange2}, cb);
+				intercom.send(orgMsg2, {'exchange': exchange2}, function (err, msgUuid) {
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+					if (err) throw err;
+					cb(err);
+				});
 			});
 
 			async.series(tasks, function (err) {
@@ -599,7 +615,7 @@ describe('Send and receive', function () {
 			});
 		});
 
-		it('send 1000 messages on subscription', function (done) {
+		it('send 100 messages on subscription', function (done) {
 			const	intercom	= new Intercom('loopback interface');
 
 			let	receivedMsgs	= 0,
@@ -615,7 +631,7 @@ describe('Send and receive', function () {
 				assert(deliveryTag, 'deliveryTag should be non-empty');
 				ack();
 
-				if (receivedMsgs === 1000) {
+				if (receivedMsgs === 100) {
 					assert.strictEqual(expectedSum, actualSum);
 					done();
 				}
@@ -623,18 +639,20 @@ describe('Send and receive', function () {
 				if (err) throw err;
 			});
 
-			for (let i = 0; i !== 1000; i ++) {
+			for (let i = 0; i !== 100; i ++) {
 				const	thisNr	= Math.round(Math.random());
 
 				expectedSum	+= thisNr;
 
-				intercom.send({'thisNr': thisNr}, function (err) {
+				intercom.send({'thisNr': thisNr}, function (err, msgUuid) {
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+
 					if (err) throw err;
 				});
 			}
 		});
 
-		it('send 1000 messages on consume', function (done) {
+		it('send 100 messages on consume', function (done) {
 			const	intercom	= new Intercom('loopback interface');
 
 			let	receivedMsgs	= 0,
@@ -650,7 +668,7 @@ describe('Send and receive', function () {
 				assert(deliveryTag, 'deliveryTag should be non-empty');
 				ack();
 
-				if (receivedMsgs === 1000) {
+				if (receivedMsgs === 100) {
 					assert.strictEqual(expectedSum, actualSum);
 					done();
 				}
@@ -658,12 +676,14 @@ describe('Send and receive', function () {
 				if (err) throw err;
 			});
 
-			for (let i = 0; i !== 1000; i ++) {
+			for (let i = 0; i !== 100; i ++) {
 				const	thisNr	= Math.round(Math.random());
 
 				expectedSum	+= thisNr;
 
-				intercom.send({'thisNr': thisNr}, function (err) {
+				intercom.send({'thisNr': thisNr}, function (err, msgUuid) {
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+
 					if (err) throw err;
 				});
 			}

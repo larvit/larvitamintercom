@@ -8,7 +8,8 @@ const	EventEmitter	= require('events').EventEmitter,
 	async	= require('async'),
 	log	= require('winston'),
 	url	= require('url'),
-	net	= require('net');
+	net	= require('net'),
+	_	= require('lodash');
 
 /**
  * Intercom
@@ -674,6 +675,7 @@ Intercom.prototype.ready = function (cb) {
  *			'exchange':	str,	// Default: "default"
  *			'durable':	boolean,	// Default: true
  *			'forceConsumeQueue':	boolean,	// Default: false - will create a consume-queue even if there currently are no listeners
+ *			'ignoreConQueue':	boolean,	// Default: undefined - will ignore the consume queue for loopback interfaces
  *		}
  * @param func cb(err, message assigned uuid)
  */
@@ -683,8 +685,9 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 		tasks	= [];
 
 	let	cbsRan	= 0,
-		cbErr,
-		stringifiedMsg;
+		stringifiedMsg,
+		msgUuid,
+		cbErr;
 
 	if (typeof options === 'function') {
 		cb	= options;
@@ -699,11 +702,13 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 		options.exchange	= 'default';
 	}
 
-	try {
-		if (message.uuid === undefined) {
-			message.uuid = uuidLib.v4();
-		}
+	if (message.uuid === undefined) {
+		message.uuid = uuidLib.v4();
+	}
 
+	msgUuid	= message.uuid;
+
+	try {
 		stringifiedMsg = JSON.stringify(message);
 	} catch (err) {
 		log.warn(topLogPrefix + 'send() - Could not stringify message. Message attached to next log call.');
@@ -719,16 +724,21 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 			&&	that.loopbackConQueue[options.exchange]	!== 'connected'
 			&&	options.ignoreConQueue	!== true
 		) {
+			const	newOrgMsg	= _.cloneDeep(orgMsg);
+
 			if (that.loopbackConQueue[options.exchange] === undefined) {
 				that.loopbackConQueue[options.exchange] = [];
 			}
 
-			that.loopbackConQueue[options.exchange].push({'orgMsg': orgMsg, 'options': options});
-			return cb();
+			newOrgMsg.uuid = msgUuid;
+			that.loopbackConQueue[options.exchange].push({'orgMsg': newOrgMsg, 'options': options});
+
+			return cb(null, msgUuid);
 		}
 
 		that.emit('incoming_msg_' + options.exchange, message, uuidLib.v4());
-		return cb();
+
+		return cb(null, msgUuid);
 	}
 
 	// Declare exchange
