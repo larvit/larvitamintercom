@@ -237,11 +237,11 @@ function Intercom(conStr) {
 
 					if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1 && that.loopback === false) {
 						okTimeout = setTimeout(function () {
-							const	err	= new Error('no answer received from queue within 500ms');
+							const	err	= new Error('no answer received from queue within 10s');
 							log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
 							callCb = false;
 							cb(err);
-						}, 500);
+						}, 10000);
 
 						that.handle.once(that.channelName + ':' + cmdStr + '-ok', function (x, y, z) {
 							// We want these in the outer scope, thats why the weird naming
