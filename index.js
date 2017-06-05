@@ -1,7 +1,7 @@
 'use strict';
 
 const	EventEmitter	= require('events').EventEmitter,
-	topLogPrefix	= 'larvitamintercom: index.js - ',
+	topLogPrefix	= 'larvitamintercom: index.js: ',
 	uuidLib	= require('uuid'),
 	bramqp	= require('bramqp'),
 	lUtils	= require('larvitutils'),
@@ -57,7 +57,11 @@ function Intercom(conStr) {
 		log.verbose(logPrefix + 'Initializing on ' + that.host + ':' + that.port);
 
 		that.socket.on('error', function (err) {
-			log.error(logPrefix + 'socket error: ' + err.message);
+			if (that.expectingClose === true) {
+				log.info(logPrefix + 'expecting socket close, but got error: ' + err.message);
+			} else {
+				log.error(logPrefix + 'socket error: ' + err.message);
+			}
 		});
 
 		that.socket.on('close', function (hadError) {
