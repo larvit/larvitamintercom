@@ -1,3 +1,4 @@
-node_modules
 config/amqp_test.json
 config/amqp.json
+node_modules
+package-lock.json
