@@ -39,6 +39,7 @@ function Intercom(conStr) {
 	that.sendInProgress	= false;
 	that.sendQueue	= [];
 	that.uuid	= uuidLib.v4();
+	that.boundQueues	= []; // list of queues that is bound so to limit network talk
 
 	logPrefix += 'uuid: ' + that.uuid + ' - ';
 
@@ -317,12 +318,15 @@ Intercom.prototype.__proto__ = EventEmitter.prototype;
 
 Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 	const	logPrefix	= topLogPrefix + 'Intercom.prototype.bindQueue() - conUuid: ' + this.uuid + ' - ',
-		noWait	= false,	// "If set, the server will not respond to the method. The client
-				// should not wait for a reply method. If the server could not complete
-				// the method it will raise a channel or connection exception."
-				// - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
+		noWait	= false,	//	"If set, the server will not respond to the method. The client
+		//			should not wait for a reply method. If the server could not complete
+		//			the method it will raise a channel or connection exception."
+		//			- https://www.rabbitmq.com/amqp-0-9-1-reference.html
+		args	= {},	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
 		that	= this;
+
+	if (that.boundQueues[queueName + '___' + exchange] === true) return cb();
+	that.boundQueues[queueName + '___' + exchange]	= true;
 
 	log.verbose(logPrefix + 'Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
@@ -421,15 +425,15 @@ Intercom.prototype.consume = function (options, msgCb, cb) {
 
 Intercom.prototype.declareExchange = function (exchangeName, cb) {
 	const	exchangeType	= 'fanout',
-		autoDelete	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.auto-delete
+		autoDelete	= false,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.auto-delete
 		logPrefix	= topLogPrefix + 'Intercom.prototype.declareExchange() - conUuid: ' + this.uuid + ' - exchangeName: "' + exchangeName + '" - ',
-		internal	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.internal
-		passive	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.passive
-		durable	= true,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.durable
-		noWait	= false,	// "If set, the server will not respond to the method. The client should not wait
-				// for a reply method. If the server could not complete the method it will raise
-				// a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.arguments
+		internal	= false,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.internal
+		passive	= false,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.passive
+		durable	= true,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.durable
+		noWait	= false,	//	"If set, the server will not respond to the method. The client should not wait
+		//			for a reply method. If the server could not complete the method it will raise
+		//			a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+		args	= {},	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#exchange.declare.arguments
 		that	= this;
 
 	log.silly(logPrefix);
@@ -470,13 +474,13 @@ Intercom.prototype.declareExchange = function (exchangeName, cb) {
  * @param func cb(err, queueName)
  */
 Intercom.prototype.declareQueue = function (options, cb) {
-	const	autoDelete	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.auto-delete
-		passive	= false,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.passive
-		durable	= (options.durable === undefined) ? true : options.durable,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.durable
-		noWait	= false,	//  "If set, the server will not respond to the method. The client should not
-				// wait for a reply method. If the server could not complete the method it will
-				// raise a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-		args	= {},	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.arguments
+	const	autoDelete	= false,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.auto-delete
+		passive	= false,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.passive
+		durable	= (options.durable === undefined) ? true : options.durable,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.durable
+		noWait	= false,	//	"If set, the server will not respond to the method. The client should not
+		//			wait for a reply method. If the server could not complete the method it will
+		//			raise a channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+		args	= {},	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.arguments
 		that	= this;
 
 	let	logPrefix	= topLogPrefix + 'Intercom.prototype.declareQueue() - conUuid: ' + this.uuid;
@@ -612,19 +616,19 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 	// Start consuming
 	tasks.push(function (cb) {
-		const	consumerTag	= null,	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.consumer-tag
-			noLocal	= false,	// "If the no-local field is set the server will not send messages to the connection
-					// that published them." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-			noWait	= false,	// "If set, the server will not respond to the method. The client should not wait
-					// for a reply method. If the server could not complete the method it will raise a
-					// channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-			noAck	= false,	// "If this field is set the server does not expect acknowledgements for messages.
-					// That is, when a message is delivered to the client the server assumes the delivery
-					// will succeed and immediately dequeues it. This functionality may increase performance
-					// but at the cost of reliability. Messages can get lost if a client dies before they
-					// are delivered to the application." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
-			exclusive	= options.exclusive,	// Request exclusive consumer access, meaning only this consumer can access the queue.
-			args	= {};	// https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
+		const	consumerTag	= null,	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.consumer-tag
+			noLocal	= false,	//	"If the no-local field is set the server will not send messages to the connection
+			//			that published them." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+			noWait	= false,	//	"If set, the server will not respond to the method. The client should not wait
+			//			for a reply method. If the server could not complete the method it will raise a
+			//			channel or connection exception." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+			noAck	= false,	//	"If this field is set the server does not expect acknowledgements for messages.
+			//			That is, when a message is delivered to the client the server assumes the delivery
+			//			will succeed and immediately dequeues it. This functionality may increase performance
+			//			but at the cost of reliability. Messages can get lost if a client dies before they
+			//			are delivered to the application." - https://www.rabbitmq.com/amqp-0-9-1-reference.html
+			exclusive	= options.exclusive,	//	Request exclusive consumer access, meaning only this consumer can access the queue.
+			args	= {};	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#basic.consume.arguments
 
 		// No need to send a command on the queue for the loopback, handle this directly in the send function
 		if (that.loopback === true) return cb();
@@ -741,14 +745,14 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 
 	if (that.loopback === true) {
 		if (
-				options.forceConsumeQueue	=== true
-			&&	that.loopbackConQueue[options.exchange]	!== 'connected'
-			&&	options.ignoreConQueue	!== true
+			options.forceConsumeQueue	=== true
+			&& that.loopbackConQueue[options.exchange]	!== 'connected'
+			&& options.ignoreConQueue	!== true
 		) {
 			const	newOrgMsg	= _.cloneDeep(orgMsg);
 
 			if (that.loopbackConQueue[options.exchange] === undefined) {
-				that.loopbackConQueue[options.exchange] = [];
+				that.loopbackConQueue[options.exchange]	= [];
 			}
 
 			newOrgMsg.uuid = msgUuid;

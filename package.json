@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -32,8 +32,8 @@
     "winston": "^2.2.0"
   },
   "devDependencies": {
-    "eslint": "^3.1.1",
-    "mocha": "^3.1.0",
-    "mocha-eslint": "^3.0.1"
+    "eslint": "^4.19.1",
+    "mocha": "^5.1.1",
+    "mocha-eslint": "^4.1.0"
   }
 }
