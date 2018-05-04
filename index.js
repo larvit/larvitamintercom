@@ -40,6 +40,7 @@ function Intercom(conStr) {
 	that.sendQueue	= [];
 	that.uuid	= uuidLib.v4();
 	that.boundQueues	= []; // list of queues that is bound so to limit network talk
+	that.declaredQueues	= []; // list of queues that is declared to limit network talk
 
 	logPrefix += 'uuid: ' + that.uuid + ' - ';
 
@@ -483,29 +484,40 @@ Intercom.prototype.declareQueue = function (options, cb) {
 		args	= {},	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.declare.arguments
 		that	= this;
 
-	let	logPrefix	= topLogPrefix + 'Intercom.prototype.declareQueue() - conUuid: ' + this.uuid;
+	let	logPrefix	= topLogPrefix + 'Intercom.prototype.declareQueue() - conUuid: ' + this.uuid + ' - ',
+		queueKey;
 
 	if ( ! options.queueName)	{ options.queueName	= '';	}
 	if (options.exclusive === undefined)	{ options.exclusive	= false;	}
 
-	logPrefix += ' - queueName: "' + options.queueName + '" - exclusive: ' + options.exclusive.toString() + ' - ';
+	logPrefix += 'queueName: "' + options.queueName + '" - exclusive: ' + options.exclusive.toString() + ' - ';
+
+	queueKey = String(that.channelName);
+	queueKey += options.queueName;
+	queueKey += String(options.exclusive);
+	queueKey += String(passive);
+	queueKey += String(durable);
+	queueKey += JSON.stringify(args);
+
+	if (autoDelete === false && that.declaredQueues[queueKey] === true) return cb(null, options.queueName);
+	that.declaredQueues[queueKey]	= true;
 
 	log.verbose(logPrefix + 'Declaring');
 
-	if (that.loopback === true) return cb();
+	if (that.loopback === true) return cb(null, options.queueName);
 
 	that.ready(function (err) {
 		if (err) return cb(err);
 
 		that.handle.cmd('queue.declare', [that.channelName, options.queueName, passive, durable, options.exclusive, autoDelete, noWait, args], function (err, channel, method, data) {
-			let queueName;
+			let	queueName;
 
 			if (err) {
 				log.error(logPrefix + 'Could not declare queue, err: ' + err.message);
 				return cb(err);
 			}
 
-			queueName = data.queue;
+			queueName	= data.queue;
 			log.silly(logPrefix + 'Declared!');
 			cb(err, queueName);
 		});
