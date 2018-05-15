@@ -16,7 +16,7 @@ log.remove(log.transports.Console);
 /**/log.add(log.transports.Console, {
 	'colorize':	true,
 	'timestamp':	true,
-	'level':	'warn',
+	'level':	'info',
 	'json':	false
 });
 /**/
@@ -36,6 +36,7 @@ before(function (done) {
 			});
 		}
 
+		// Wait until all is connected and ready
 		// Wait until all is connected and ready
 		async.parallel(tasks, done);
 	}
@@ -689,7 +690,7 @@ describe('Send and receive', function () {
 			}
 		});
 
-		it('send before consumer is up and still receive', function (done) {
+		it('send before consumer is up and still receive 2', function (done) {
 			const	intercom	= new Intercom('loopback interface'),
 				exchange	= 'dkfia893M', // Random exchange to not collide with another test
 				orgMsg	= {'foo': 'bar'};
