@@ -101,8 +101,10 @@ function Intercom(conStr) {
 			});
 		});
 
+
+
 		// Open AMQP communication
-		tasks.push(function (cb) {
+		tasks.push(function () {
 			const	heartBeat	= true,
 				auth	= parsedConStr.auth;
 
@@ -122,9 +124,17 @@ function Intercom(conStr) {
 					that.emit('error', err);
 				}
 
-				cb(err);
+
+
 			});
 		});
+
+		/*
+		tasks.push(function(cb){
+				that.handle.basic.qos(0, 10, false);
+				cb()
+		})
+		*/
 	}
 
 	// Register listener for incoming messages
@@ -188,7 +198,7 @@ function Intercom(conStr) {
 
 	// Construct generic handle comms
 	tasks.push(function (cb) {
-		const	cmdStrsWithoutOk	= ['basic.publish', 'content', 'closeAMQPCommunication', 'basic.nack', 'basic.ack'];
+		const	cmdStrsWithoutOk	= ['basic.publish', 'content', 'closeAMQPCommunication', 'basic.nack', 'basic.ack', 'basic.qos'];
 
 		that.handle.cmd = function cmd(cmdStr, params, cb) {
 			if (typeof cb !== 'function') {
@@ -275,6 +285,7 @@ function Intercom(conStr) {
 
 					params.push(cmdCb);
 
+
 					if (cmdName) {
 						that.handle[cmdGroupName][cmdName].apply(that.handle, params);
 					} else {
@@ -298,6 +309,8 @@ function Intercom(conStr) {
 		};
 		cb();
 	});
+
+
 
 	async.series(tasks, function (err) {
 		if ( ! err) {
@@ -348,6 +361,38 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 	});
 };
 
+/*
+Intercom.prototype.purgeQueue = function (queueName, cb) {
+	const	logPrefix	= topLogPrefix + 'Intercom.prototype.purgeQueue() - conUuid: ' + this.uuid + ' - ',
+				 noWait	= false,	//	"If set, the server will not respond to the method. The client
+				 //			should not wait for a reply method. If the server could not complete
+				 //			the method it will raise a channel or connection exception."
+				 //			- https://www.rabbitmq.com/amqp-0-9-1-reference.html
+				 args	= {},	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
+				 that	= this;
+
+	log.verbose(logPrefix + 'Purging queue "' + queueName + '" ');
+
+	if (that.loopback === true) return cb();
+
+	that.ready(function (err) {
+		if (err) return cb(err);
+
+		that.handle.cmd('queue.purge', [17, queueName, false], function (err) {
+			if (err) {
+				console.log('==== Purge queue error');
+				console.dir(err);
+				log.error(logPrefix + 'Could not purge queue: "' + queueName + '", err: ' + err.message);
+			}
+
+			log.silly(logPrefix + 'Purged queue "' + queueName + '"');
+
+			cb(err);
+		});
+	});
+};
+*/
+
 // Close the RabbitMQ connection
 Intercom.prototype.close = function (cb) {
 	const	logPrefix	= topLogPrefix + 'close() - conUuid: ' + this.uuid + ' - ',
@@ -369,7 +414,7 @@ Intercom.prototype.close = function (cb) {
 	that.ready(function (err) {
 		if (err) return cb(err);
 
-		that.handle.cmd('closeAMQPCommunication', function (err) {
+		that.handle.cmd('closeAMQPCommunication', [], function (err) {
 			if (err) {
 				log.warn(logPrefix + 'Could not closeAMQPCommunication: ' + err.message);
 				return cb(err);
@@ -646,22 +691,31 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 		if (that.loopback === true) return cb();
 
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function (err, channel, method, data) {
-			let	consumerTag;
+			let	consumerTag,
+				win = options.window || 8;
 
 			if (err) return cb(err);
 
-			returnObj.channel	= channel;
-			returnObj.method	= method;
-			returnObj.data	= data;
+			console.log('genericConsume setting QoS to ' + win + ' .............................................');
+			//that.handle.cmd('basic.qos', [10000, win, false], function(e, d)
+			that.handle.cmd('basic.qos', [that.channelName, 0, win, true], function()	{
+				console.log('genericConsume returned from QoS .............................................');
+				//console.dir(e)
+				//console.dir(d)
 
-			if (data !== undefined && data['consumer-tag'] !== undefined) {
-				consumerTag = data['conumer-tag'];
-			} else {
-				log.warn(logPrefix + 'No consumerTag obtained for queue: "' + queueName + '"');
-			}
+				returnObj.channel	= channel;
+				returnObj.method	= method;
+				returnObj.data	= data;
 
-			log.verbose(logPrefix + 'Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
-			cb();
+				if (data !== undefined && data['consumer-tag'] !== undefined) {
+					consumerTag = data['consumer-tag'];
+				} else {
+					log.warn(logPrefix + 'No consumerTag obtained for queue: "' + queueName + '"');
+				}
+
+				log.verbose(logPrefix + 'Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
+				cb();
+			});
 		});
 	});
 
@@ -682,7 +736,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 					that.handle.cmd('basic.nack', [that.channelName, deliveryTag]);
 				} else {
 					log.silly(logPrefix + 'ack on deliveryTag: "' + deliveryTag + '"');
-					that.handle.cmd('basic.nack', [that.channelName, deliveryTag]);
+					that.handle.cmd('basic.ack', [that.channelName, deliveryTag]);
 				}
 			}, deliveryTag);
 		});

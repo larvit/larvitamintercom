@@ -21,6 +21,7 @@ log.remove(log.transports.Console);
 });
 /**/
 
+
 before(function (done) {
 	this.timeout(20000);
 
@@ -244,6 +245,106 @@ describe('Send and receive', function () {
 
 			async.parallel(tasks, done);
 		});
+
+			//
+			//--------------------------------------------------------------------------------- ack test
+			//
+
+			it('should get a message resend if closing a channel and opening up again without acking a received message', function (done) {
+
+					let r = undefined
+					intercoms[2].consume({'exchange': 'xyzzy43'}, function (msg, ack, deliveryTag) {
+							console.log('ack test got message: foo = '+msg.foo)
+							ack()
+							r = msg.foo
+							intercoms[2].close(function(){
+									console.log('close result')
+									if(r === 17){
+											intercoms[4].consume({'exchange': 'xyzzy43'}, function (msg, ack, deliveryTag) {
+												console.log('new intercom receieved message. foo = '+msg.foo)
+													assert(msg.foo, 17)
+													ack()
+													done()
+											})
+									}
+							})
+
+					});
+
+					intercoms[3].send({foo: 17}, {'exchange': 'xyzzy43'}, function (err) {
+							if (err) {
+									console.log('squelch test error: err')
+									console.dir(err)
+									throw err;
+							}
+					});
+			})
+
+
+					//
+		//--------------------------------------------------------------------------------- Squelch test
+		//
+
+
+		it('should wait to send more messages when squelching is on', function (done) {
+
+				let tosend = 12;
+				let recieved = 0;
+				let acks = [];
+
+				function send(x){
+					console.log('squelch send '+x.foo)
+					intercoms[1].send(x, {'exchange': 'xyzzy'}, function (err) {
+						if (err) {
+							console.log('squelch test error: err')
+							console.dir(err)
+							throw err;
+						}
+
+					});
+				}
+
+				function checkFinished(){
+					console.log('checkFinished')
+					setTimeout(function(){
+						assert(recieved,  6)
+						console.log('final recieved count: '+recieved+' -- sending all ACKs')
+						acks.forEach(function(ack){
+							ack()
+						})
+						//console.log('----- purging and resolving')
+						//intercoms[1].purgeQueue('queTo_xyzzy43', function(e,r){
+						//console.log('queued purged')
+							setTimeout(function() {
+									//console.log('CALLING DONE NAO FFS!!!')
+									done()
+							},250)
+						//})
+					},100)
+				}
+
+				console.log('test setting up intercom listener')
+				intercoms[4].consume({'exchange': 'xyzzy'}, function (msg, ack, deliveryTag) {
+					recieved++
+					console.log('squelch recevied total messages: '+recieved+' foo = '+msg.foo)
+					acks.push(ack)
+					if(recieved === 6){
+							checkFinished()
+					}
+				});
+
+				setTimeout(function(){
+						let count = tosend
+						while(count-- > 0){
+								send({foo: count})
+						}
+				},1500)
+
+
+		});
+
+
+
 
 		it('send and receive multiple messages on different Intercoms', function (done) {
 			const	tasks	= [],
