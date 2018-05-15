@@ -695,13 +695,8 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 				win = options.window || 8;
 
 			if (err) return cb(err);
-
-			console.log('genericConsume setting QoS to ' + win + ' .............................................');
 			//that.handle.cmd('basic.qos', [10000, win, false], function(e, d)
 			that.handle.cmd('basic.qos', [that.channelName, 0, win, true], function()	{
-				console.log('genericConsume returned from QoS .............................................');
-				//console.dir(e)
-				//console.dir(d)
 
 				returnObj.channel	= channel;
 				returnObj.method	= method;
