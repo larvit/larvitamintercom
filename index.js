@@ -101,8 +101,6 @@ function Intercom(conStr) {
 			});
 		});
 
-
-
 		// Open AMQP communication
 		tasks.push(function (cb) {
 			const	heartBeat	= true,
@@ -121,7 +119,6 @@ function Intercom(conStr) {
 			that.password = password;
 			that.heartBeat = heartBeat;
 			that.open(cb);
-
 		});
 	}
 
@@ -273,7 +270,6 @@ function Intercom(conStr) {
 
 					params.push(cmdCb);
 
-
 					if (cmdName) {
 						that.handle[cmdGroupName][cmdName].apply(that.handle, params);
 					} else {
@@ -298,8 +294,6 @@ function Intercom(conStr) {
 		cb();
 	});
 
-
-
 	async.series(tasks, function (err) {
 		if ( ! err) {
 			if (that.loopback === true) {
@@ -323,7 +317,6 @@ Intercom.prototype.open = function (cb) {
 		}
 
 		cb(err);
-
 	});
 };
 
@@ -385,7 +378,6 @@ Intercom.prototype.purgeQueue = function (queueName, cb) {
 	});
 };
 
-
 // Close the RabbitMQ connection
 Intercom.prototype.close = function (cb) {
 	const	logPrefix	= topLogPrefix + 'close() - conUuid: ' + this.uuid + ' - ',
@@ -402,7 +394,7 @@ Intercom.prototype.close = function (cb) {
 		log.verbose(logPrefix + 'on ' + that.host + ':' + that.port);
 	}
 
-	that.expectingClose = true;
+	that.expectingClose	= true;
 
 	that.ready(function (err) {
 		if (err) return cb(err);
@@ -412,6 +404,8 @@ Intercom.prototype.close = function (cb) {
 				log.warn(logPrefix + 'Could not closeAMQPCommunication: ' + err.message);
 				return cb(err);
 			}
+
+			that.handle.socket.destroy();
 
 			setImmediate(function () {
 				log.verbose(logPrefix + 'closed ' + that.host + ':' + that.port);
