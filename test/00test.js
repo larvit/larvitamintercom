@@ -2,6 +2,7 @@
 
 const	intercoms	= [],
 	Intercom	= require(__dirname + '/../index.js'),
+	//uuidLib	= require('uuid'),
 	assert	= require('assert'),
 	lUtils	= require('larvitutils'),
 	async	= require('async'),
@@ -26,7 +27,7 @@ before(function (done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 21; i ++) {
+		for (let i = 0; i < 27; i ++) {
 			tasks.push(function (cb) {
 				const	intercom	= new Intercom(config);
 				intercoms.push(intercom);
@@ -50,27 +51,6 @@ before(function (done) {
 		throw err;
 	}
 });
-
-/*after(function (done) {
-	const	tasks	= [];
-
-	this.timeout(10000);
-
-	for (let i = 0; intercoms[i] !== undefined; i ++) {
-		const	intercom	= intercoms[i];
-		tasks.push(function (cb) {
-			console.log('Closing intercom ' + i);
-			intercom.close(function (err) {
-				if (err) throw err;
-
-				console.log('Closed intercom: ' + i);
-				cb(err);
-			});
-		});
-	}
-
-	async.parallel(tasks, done);
-});*/
 
 describe('Send and receive', function () {
 
@@ -222,84 +202,138 @@ describe('Send and receive', function () {
 		});
 
 		// ack test
-		it('should get a message resend if closing a channel and opening up again without acking a received message', function (done) {
-			let	r	= undefined;
+		/*it('should get a message resend if closing a connection and opening up again without acking a received message', function (done) {
+			const	sendIntercom	= intercoms[12],
+				consumeIntercom1	= intercoms[13],
+				consumeIntercom2	= intercoms[14],
+				exchangeName	= 'test_noAckResend',
+				uuid	= uuidLib.v1(),
+				tasks	= [];
 
-			intercoms[20].consume({'exchange': 'xyzzy43'}, function (msg /*, ack */) {
-				//ack();
+			this.timeout(10000);
 
-				r	= msg.foo;
-				intercoms[20].close(function () {
-					if (r === 17) {
-						setTimeout(function () {
-							intercoms[2].consume({'exchange': 'xyzzy43'}, function (msg, ack) {
-								assert(msg.foo,	17);
-								ack();
-								done();
-							});
-						}, 1500);
+			// Start consuming on intercom 1, do not ack!
+			tasks.push(function (cb) {
+				consumeIntercom1.consume({'exchange': exchangeName}, function (msg) {
+					if (msg.foo !== uuid) {
+						throw new Error('Invalid message received');
 					}
-				});
+
+					console.log('got message');
+
+					// Close connection directly when message received, no acking!
+					consumeIntercom1.close();
+				}, cb);
 			});
 
-			intercoms[3].send({foo: 17}, {'exchange': 'xyzzy43'}, function (err) {
-				if (err) {
-					throw err;
-				}
+			// Send message
+			tasks.push(function (cb) {
+				sendIntercom.send({'foo': uuid}, {'exchange': exchangeName}, cb);
 			});
-		});
+
+			// After a while, start up another consumer to get the non-acked message
+			tasks.push(function (cb) {
+				setTimeout(function () {
+					consumeIntercom2.consume({'exchange': exchangeName}, function (msg, ack) {
+						console.log('got message again yo!!1!');
+
+						ack(); // Ack directly to remove from queue
+						if (msg.foo !== uuid) {
+							throw new Error('Invalid message received');
+						}
+						done();
+					}, cb);
+				}, 5000);
+			});
+
+			async.series(tasks, function (err) {
+				if (err) throw err;
+				done();
+			});
+		});*/
 
 		// Squelch test - limit amount of sent messages before receiving ack:s
 		it('should wait to send more messages when squelching is on', function (done) {
-			let	recieved	= 0,
-				tosend	= 12,
-				acks	= [];
+			const	exchangeName	= 'test_squelcing',
+				sendIntercom	= intercoms[15],
+				consIntercom	= intercoms[16],
+				acks	= [],
+				tasks	= [];
 
-			function send(x) {
-				intercoms[1].send(x, {'exchange': 'xyzzy'}, function (err) {
-					if (err) {
-						throw err;
-					}
-				});
-			}
+			let	receivedMsgs	= 0;
 
-			function checkFinished() {
-				setTimeout(function () {
-					assert(recieved,  6);
-					acks.forEach(function (ack) {
-						ack();
-					});
-					setTimeout(function () {
-						done();
-					}, 250);
-				}, 100);
-			}
-
-			intercoms[4].consume({'exchange': 'xyzzy'}, function (msg, ack) {
-				recieved ++;
-				acks.push(ack);
-				if (recieved === 6) {
-					checkFinished();
-				}
+			// Start a consumer
+			tasks.push(function (cb) {
+				consIntercom.consume({'exchange': exchangeName}, function (msg, ack) {
+					receivedMsgs ++;
+					acks.push(ack);
+				}, cb);
 			});
 
-			setTimeout(function () {
-				let	count	= tosend;
+			// Send 12 messages
+			tasks.push(function (cb) {
+				const	tasks	= [];
 
-				while (count -- > 0) {
-					send({foo: count});
+				for (let i = 0; i !== 12; i ++) {
+					const	msg	= {'i': i};
+					tasks.push(function (cb) {
+						sendIntercom.send(msg, {'exchange': exchangeName}, cb);
+					});
 				}
-			}, 1500);
+
+				async.series(tasks, cb);
+			});
+
+			// Check that only 10 have arrived
+			tasks.push(function (cb) {
+				// Wait 200ms to give rabbit some space to send the messages
+				setTimeout(function () {
+					assert.strictEqual(receivedMsgs,	10);
+					cb();
+				}, 200);
+			});
+
+			// Run queuend acks
+			tasks.push(function (cb) {
+				while (acks.length) {
+					acks[0]();
+					acks.splice(0, 1); // Remove first element from array
+				}
+				cb();
+			});
+
+			// Check that we got the last 2 messages, for a total of 12
+			tasks.push(function (cb) {
+				// Wait 200ms to give rabbit some space to send the messages
+				setTimeout(function () {
+					assert.strictEqual(receivedMsgs,	12);
+					cb();
+				}, 200);
+			});
+
+			// Run the remaining acks
+			tasks.push(function (cb) {
+				while (acks.length) {
+					acks[0]();
+					acks.splice(0, 1); // Remove first element from array
+				}
+				cb();
+			});
+
+			async.series(tasks, function (err) {
+				if (err) throw err;
+				done();
+			});
 		});
 
 		it('send and receive multiple messages on different Intercoms', function (done) {
 			const	tasks	= [],
 				intercom	= {
 					'subscribe': {
-						'intercom1': intercoms[12], 'intercom2': intercoms[13]
+						'intercom1': intercoms[17], 'intercom2': intercoms[18]
 					},
 					'consume': {
-						'intercom1': intercoms[14], 'intercom2': intercoms[15]
+						'intercom1': intercoms[19], 'intercom2': intercoms[20]
 					}
 				};
 
@@ -344,7 +378,7 @@ describe('Send and receive', function () {
 		});
 
 		it('send and receive multiple messages on the same Intercom', function (done) {
-			const	intercom	= {'subscribe': intercoms[16], 'consume': intercoms[17]},
+			const	intercom	= {'subscribe': intercoms[21], 'consume': intercoms[22]},
 				tasks	= [];
 
 			for (const method of Object.keys(intercom)) {
@@ -398,7 +432,7 @@ describe('Send and receive', function () {
 				receivedMsg2	= 0;
 
 			tasks.push(function (cb) {
-				intercoms[0].subscribe({'exchange': exchange1}, function (msg, ack) {
+				intercoms[23].subscribe({'exchange': exchange1}, function (msg, ack) {
 					assert.deepStrictEqual(msg.bar, orgMsg1.bar);
 					receivedMsg1 ++;
 					ack();
@@ -406,7 +440,7 @@ describe('Send and receive', function () {
 			});
 
 			tasks.push(function (cb) {
-				intercoms[0].subscribe({'exchange': exchange2}, function (msg, ack) {
+				intercoms[23].subscribe({'exchange': exchange2}, function (msg, ack) {
 					assert.deepStrictEqual(msg.waffer, orgMsg2.waffer);
 					receivedMsg2 ++;
 					ack();
@@ -414,11 +448,11 @@ describe('Send and receive', function () {
 			});
 
 			tasks.push(function (cb) {
-				intercoms[0].send(orgMsg1, {'exchange': exchange1}, cb);
+				intercoms[23].send(orgMsg1, {'exchange': exchange1}, cb);
 			});
 
 			tasks.push(function (cb) {
-				intercoms[0].send(orgMsg2, {'exchange': exchange2}, cb);
+				intercoms[23].send(orgMsg2, {'exchange': exchange2}, cb);
 			});
 
 			async.series(tasks, function (err) {
@@ -436,17 +470,17 @@ describe('Send and receive', function () {
 		});
 
 		it('send before consumer is up and still receive', function (done) {
-			const	exchange	= 'dkfia893M', // Random exchange to not collide with another test
+			const	exchange	= 'test_sendBeforeConsume', // Random exchange to not collide with another test
 				orgMsg	= {'foo': 'bar'};
 
 			this.timeout(2000);
 			this.slow(200);
 
-			intercoms[0].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true }, function (err) {
+			intercoms[24].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function (err) {
 				if (err) throw err;
 
 				setTimeout(function () {
-					intercoms[1].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
+					intercoms[25].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
 						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 						delete msg.uuid;
 						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
@@ -462,7 +496,7 @@ describe('Send and receive', function () {
 		});
 
 		it('send and declare exchanges at the same time', function (done) {
-			const	intercom	= intercoms[0],
+			const	intercom	= intercoms[26],
 				exchange	= 'breakCmdChain',
 				orgMsg1	= {'blippel': 'bloppel'},
 				orgMsg2	= {'maffab': 'berk'};
@@ -739,7 +773,7 @@ describe('Send and receive', function () {
 
 		it('send before consumer is up and still receive 2', function (done) {
 			const	intercom	= new Intercom('loopback interface'),
-				exchange	= 'dkfia893M', // Random exchange to not collide with another test
+				exchange	= 'test_sendBeforeConsume2', // Random exchange to not collide with another test
 				orgMsg	= {'foo': 'bar'};
 
 			this.timeout(2000);

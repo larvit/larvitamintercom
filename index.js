@@ -95,7 +95,7 @@ function Intercom(conStr) {
 
 				log.silly(logPrefix + 'bramqp.initialize() ran on ' + that.host + ':' + that.port);
 
-				that.handle = result;
+				that.handle	= result;
 
 				cb(err);
 			});
@@ -115,10 +115,15 @@ function Intercom(conStr) {
 			}
 
 			log.debug(logPrefix + 'openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
-			that.username = username;
-			that.password = password;
-			that.heartBeat = heartBeat;
-			that.open(cb);
+
+			that.handle.openAMQPCommunication(username, password, heartBeat, function (err) {
+				if (err) {
+					log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
+					that.emit('error', err);
+				}
+
+				cb(err);
+			});
 		});
 	}
 
@@ -294,6 +299,18 @@ function Intercom(conStr) {
 		cb();
 	});
 
+	// Set QoS to 10
+	tasks.push(function (cb) {
+		const	prefetchSize	= 0,
+			prefetchCount	= 10,
+			global	= true;
+
+		that.handle.cmd('basic.qos', [that.channelName, prefetchSize, prefetchCount, global], function (err) {
+			log.verbose(logPrefix + 'basic.qos set to: "' + prefetchCount + '"');
+			cb(err);
+		});
+	});
+
 	async.series(tasks, function (err) {
 		if ( ! err) {
 			if (that.loopback === true) {
@@ -308,17 +325,6 @@ function Intercom(conStr) {
 		}
 	});
 }
-
-Intercom.prototype.open = function (cb) {
-	this.handle.openAMQPCommunication(this.username, this.password, this.heartBeat, function (err) {
-		if (err) {
-			log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
-			this.emit('error', err);
-		}
-
-		cb(err);
-	});
-};
 
 // Make Intercom an event emitter
 Intercom.prototype.__proto__ = EventEmitter.prototype;
@@ -348,29 +354,6 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 			}
 
 			log.silly(logPrefix + 'Bound queue "' + queueName + '" to exchange "' + exchange + '"');
-
-			cb(err);
-		});
-	});
-};
-
-Intercom.prototype.purgeQueue = function (queueName, cb) {
-	const	logPrefix	= topLogPrefix + 'Intercom.prototype.purgeQueue() - conUuid: ' + this.uuid + ' - ',
-		that	= this;
-
-	log.verbose(logPrefix + 'Purging queue "' + queueName + '" ');
-
-	if (that.loopback === true) return cb();
-
-	that.ready(function (err) {
-		if (err) return cb(err);
-
-		that.handle.cmd('queue.purge', [that.handle.channelName, queueName, false], function (err) {
-			if (err) {
-				log.error(logPrefix + 'Could not purge queue: "' + queueName + '", err: ' + err.message);
-			}
-
-			log.silly(logPrefix + 'Purged queue "' + queueName + '"');
 
 			cb(err);
 		});
@@ -585,7 +568,6 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 	let	queueName;
 
-
 	if (cb === undefined) {
 		cb = function () {};
 	}
@@ -676,32 +658,29 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 		if (that.loopback === true) return cb();
 
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function (err, channel, method, data) {
-			let	win	= options.window || 800,
-				consumerTag;
+			let	consumerTag;
 
 			if (err) return cb(err);
-			//that.handle.cmd('basic.qos', [10000, win, false], function(e, d)
-			that.handle.cmd('basic.qos', [that.channelName, 0, win, true], function () {
-				log.verbose(logPrefix + 'Set basic.qos for queue: "' + queueName + '" to ' + win);
-				returnObj.channel	= channel;
-				returnObj.method	= method;
-				returnObj.data	= data;
 
-				if (data !== undefined && data['consumer-tag'] !== undefined) {
-					consumerTag	= data['consumer-tag'];
-				} else {
-					log.warn(logPrefix + 'No consumerTag obtained for queue: "' + queueName + '"');
-				}
+			returnObj.channel	= channel;
+			returnObj.method	= method;
+			returnObj.data	= data;
 
-				log.verbose(logPrefix + 'Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
-				cb();
-			});
+			if (data !== undefined && data['consumer-tag'] !== undefined) {
+				consumerTag = data['conumer-tag'];
+			} else {
+				log.warn(logPrefix + 'No consumerTag obtained for queue: "' + queueName + '"');
+			}
+
+			log.verbose(logPrefix + 'Started consuming on queue: "' + queueName + '" with consumer tag: "' + consumerTag + '"');
+			cb();
 		});
 	});
 
 	// Register msgCb
 	tasks.push(function (cb) {
 		const	eventName	= 'incoming_msg_' + options.exchange;
+
 		if (that.listenerCount(eventName) !== 0) {
 			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
 			log.warn(topLogPrefix + 'genericConsume() - ' + err.message);
