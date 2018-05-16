@@ -354,10 +354,9 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 	});
 };
 
-
 Intercom.prototype.purgeQueue = function (queueName, cb) {
 	const	logPrefix	= topLogPrefix + 'Intercom.prototype.purgeQueue() - conUuid: ' + this.uuid + ' - ',
-				 that	= this;
+		that	= this;
 
 	log.verbose(logPrefix + 'Purging queue "' + queueName + '" ');
 
@@ -399,13 +398,11 @@ Intercom.prototype.close = function (cb) {
 	that.ready(function (err) {
 		if (err) return cb(err);
 
-		that.handle.cmd('closeAMQPCommunication', [], function (err) {
+		that.handle.closeAMQPCommunication(function (err) {
 			if (err) {
 				log.warn(logPrefix + 'Could not closeAMQPCommunication: ' + err.message);
 				return cb(err);
 			}
-
-			that.handle.socket.destroy();
 
 			setImmediate(function () {
 				log.verbose(logPrefix + 'closed ' + that.host + ':' + that.port);
