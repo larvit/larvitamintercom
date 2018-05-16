@@ -104,7 +104,7 @@ function Intercom(conStr) {
 
 
 		// Open AMQP communication
-		tasks.push(function () {
+		tasks.push(function (cb) {
 			const	heartBeat	= true,
 				auth	= parsedConStr.auth;
 
@@ -124,8 +124,7 @@ function Intercom(conStr) {
 					that.emit('error', err);
 				}
 
-
-
+				cb(err);
 			});
 		});
 
