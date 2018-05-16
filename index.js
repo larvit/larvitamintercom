@@ -104,7 +104,7 @@ function Intercom(conStr) {
 
 
 		// Open AMQP communication
-		tasks.push(function () {
+		tasks.push(function (cb) {
 			const	heartBeat	= true,
 				auth	= parsedConStr.auth;
 
@@ -117,24 +117,11 @@ function Intercom(conStr) {
 			}
 
 			log.debug(logPrefix + 'openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
-
-			that.handle.openAMQPCommunication(username, password, heartBeat, function (err) {
-				if (err) {
-					log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
-					that.emit('error', err);
-				}
-
-
-
-			});
+			that.username = username;
+			that.password = password;
+			that.heartBeat = heartBeat;
+			that.open(cb);
 		});
-
-		/*
-		tasks.push(function(cb){
-				that.handle.basic.qos(0, 10, false);
-				cb()
-		})
-		*/
 	}
 
 	// Register listener for incoming messages
@@ -327,6 +314,18 @@ function Intercom(conStr) {
 	});
 }
 
+Intercom.prototype.open = function(cb) {
+	this.handle.openAMQPCommunication(this.username, this.password, this.heartBeat, function (err) {
+		if (err) {
+			log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
+			this.emit('error', err);
+		}
+
+		cb(err);
+
+	});
+};
+
 // Make Intercom an event emitter
 Intercom.prototype.__proto__ = EventEmitter.prototype;
 
@@ -361,14 +360,9 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 	});
 };
 
-/*
+
 Intercom.prototype.purgeQueue = function (queueName, cb) {
 	const	logPrefix	= topLogPrefix + 'Intercom.prototype.purgeQueue() - conUuid: ' + this.uuid + ' - ',
-				 noWait	= false,	//	"If set, the server will not respond to the method. The client
-				 //			should not wait for a reply method. If the server could not complete
-				 //			the method it will raise a channel or connection exception."
-				 //			- https://www.rabbitmq.com/amqp-0-9-1-reference.html
-				 args	= {},	//	https://www.rabbitmq.com/amqp-0-9-1-reference.html#queue.bind.arguments
 				 that	= this;
 
 	log.verbose(logPrefix + 'Purging queue "' + queueName + '" ');
@@ -378,7 +372,7 @@ Intercom.prototype.purgeQueue = function (queueName, cb) {
 	that.ready(function (err) {
 		if (err) return cb(err);
 
-		that.handle.cmd('queue.purge', [17, queueName, false], function (err) {
+		that.handle.cmd('queue.purge', [that.handle.channelName, queueName, false], function (err) {
 			if (err) {
 				console.log('==== Purge queue error');
 				console.dir(err);
@@ -391,7 +385,7 @@ Intercom.prototype.purgeQueue = function (queueName, cb) {
 		});
 	});
 };
-*/
+
 
 // Close the RabbitMQ connection
 Intercom.prototype.close = function (cb) {
@@ -601,6 +595,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 	let	queueName;
 
+
 	if (cb === undefined) {
 		cb = function () {};
 	}
@@ -692,12 +687,12 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function (err, channel, method, data) {
 			let	consumerTag,
-				win = options.window || 8;
+				win = options.window || 800;
 
 			if (err) return cb(err);
 			//that.handle.cmd('basic.qos', [10000, win, false], function(e, d)
 			that.handle.cmd('basic.qos', [that.channelName, 0, win, true], function()	{
-
+				log.verbose(logPrefix + 'Set basic.qos for queue: "' + queueName + '" to ' + win);
 				returnObj.channel	= channel;
 				returnObj.method	= method;
 				returnObj.data	= data;
@@ -717,14 +712,16 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	// Register msgCb
 	tasks.push(function (cb) {
 		const	eventName	= 'incoming_msg_' + options.exchange;
-
 		if (that.listenerCount(eventName) !== 0) {
+			console.log('error on consume');
 			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
 			log.warn(topLogPrefix + 'genericConsume() - ' + err.message);
 			return cb(err);
 		}
 
 		that.on(eventName, function (message, deliveryTag) {
+			console.log('got message');
+			console.dir(message);
 			msgCb(message, function (err) {
 				if (err) {
 					log.warn(logPrefix + 'nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);

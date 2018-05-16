@@ -16,7 +16,7 @@ log.remove(log.transports.Console);
 /**/log.add(log.transports.Console, {
 	'colorize':	true,
 	'timestamp':	true,
-	'level':	'info',
+	'level':	'debug',
 	'json':	false
 });
 /**/
@@ -28,12 +28,13 @@ before(function (done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 20; i ++) {
+		for (let i = 0; i < 21; i ++) {
 			tasks.push(function (cb) {
 				const	intercom	= new Intercom(config);
-
 				intercoms.push(intercom);
-				intercom.on('ready', cb);
+				intercom.on('ready', function() {
+					cb();
+				});
 			});
 		}
 
@@ -253,16 +254,25 @@ describe('Send and receive', function () {
 		it('should get a message resend if closing a channel and opening up again without acking a received message', function (done) {
 
 			let r = undefined;
-			intercoms[2].consume({'exchange': 'xyzzy43'}, function (msg, ack, deliveryTag) {
-				ack();
+			intercoms[20].consume({'exchange': 'xyzzy43'}, function (msg /*, ack */) {
+				//ack();
+				console.log('1)')	;
 				r = msg.foo;
-				intercoms[2].close(function(){
+				intercoms[20].close(function(){
+					console.log('2)')	;
 					if(r === 17){
-						intercoms[4].consume({'exchange': 'xyzzy43'}, function (msg, ack, deliveryTag) {
-							assert(msg.foo, 17);
-							ack();
-							done();
-						});
+						setTimeout(function() {
+							console.log('3)')	;
+							//intercoms[2].open(function(oerr) {
+							//	console.log('oerr=' + oerr);
+							intercoms[2].consume({'exchange': 'xyzzy43'}, function (msg, ack) {
+								console.log('4)')	;
+								assert(msg.foo, 17);
+								ack();
+								done();
+							});
+							//});
+						}, 1500);
 					}
 				});
 
@@ -283,9 +293,9 @@ describe('Send and receive', function () {
 
 		it('should wait to send more messages when squelching is on', function (done) {
 
-			let tosend = 12;
-			let recieved = 0;
-			let acks = [];
+			let tosend = 12,
+				recieved = 0,
+				acks = [];
 
 			function send(x){
 				intercoms[1].send(x, {'exchange': 'xyzzy'}, function (err) {
@@ -309,7 +319,7 @@ describe('Send and receive', function () {
 				}, 100);
 			}
 
-			intercoms[4].consume({'exchange': 'xyzzy'}, function (msg, ack, deliveryTag) {
+			intercoms[4].consume({'exchange': 'xyzzy'}, function (msg, ack) {
 				recieved ++;
 				acks.push(ack);
 				if(recieved === 6){
@@ -478,13 +488,13 @@ describe('Send and receive', function () {
 				orgMsg	= {'foo': 'bar'};
 
 			this.timeout(2000);
-			this.slow(700);
+			this.slow(200);
 
-			intercoms[0].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function (err) {
+			intercoms[0].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true }, function (err) {
 				if (err) throw err;
 
 				setTimeout(function () {
-					intercoms[0].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
+					intercoms[1].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
 						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 						delete msg.uuid;
 						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
