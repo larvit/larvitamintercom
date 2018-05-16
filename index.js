@@ -121,6 +121,7 @@ function Intercom(conStr) {
 			that.password = password;
 			that.heartBeat = heartBeat;
 			that.open(cb);
+
 		});
 	}
 
