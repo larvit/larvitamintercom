@@ -256,17 +256,16 @@ describe('Send and receive', function () {
 			let r = undefined;
 			intercoms[20].consume({'exchange': 'xyzzy43'}, function (msg /*, ack */) {
 				//ack();
-				console.log('1)')	;
+
 				r = msg.foo;
 				intercoms[20].close(function(){
-					console.log('2)')	;
+
 					if(r === 17){
 						setTimeout(function() {
-							console.log('3)')	;
+
 							//intercoms[2].open(function(oerr) {
 							//	console.log('oerr=' + oerr);
 							intercoms[2].consume({'exchange': 'xyzzy43'}, function (msg, ack) {
-								console.log('4)')	;
 								assert(msg.foo, 17);
 								ack();
 								done();

@@ -375,8 +375,6 @@ Intercom.prototype.purgeQueue = function (queueName, cb) {
 
 		that.handle.cmd('queue.purge', [that.handle.channelName, queueName, false], function (err) {
 			if (err) {
-				console.log('==== Purge queue error');
-				console.dir(err);
 				log.error(logPrefix + 'Could not purge queue: "' + queueName + '", err: ' + err.message);
 			}
 
@@ -714,15 +712,12 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	tasks.push(function (cb) {
 		const	eventName	= 'incoming_msg_' + options.exchange;
 		if (that.listenerCount(eventName) !== 0) {
-			console.log('error on consume');
 			const	err	= new Error('Only one subscribe or consume is allowed for each exchange. exchange: "' + options.exchange + '"');
 			log.warn(topLogPrefix + 'genericConsume() - ' + err.message);
 			return cb(err);
 		}
 
 		that.on(eventName, function (message, deliveryTag) {
-			console.log('got message');
-			console.dir(message);
 			msgCb(message, function (err) {
 				if (err) {
 					log.warn(logPrefix + 'nack on deliveryTag: "' + deliveryTag + '" err: ' + err.message);
