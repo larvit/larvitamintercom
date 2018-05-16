@@ -315,7 +315,7 @@ function Intercom(conStr) {
 	});
 }
 
-Intercom.prototype.open = function(cb) {
+Intercom.prototype.open = function (cb) {
 	this.handle.openAMQPCommunication(this.username, this.password, this.heartBeat, function (err) {
 		if (err) {
 			log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
@@ -685,19 +685,19 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 		if (that.loopback === true) return cb();
 
 		that.handle.cmd('basic.consume', [that.channelName, queueName, consumerTag, noLocal, noAck, exclusive, noWait, args], function (err, channel, method, data) {
-			let	consumerTag,
-				win = options.window || 800;
+			let	win	= options.window || 800,
+				consumerTag;
 
 			if (err) return cb(err);
 			//that.handle.cmd('basic.qos', [10000, win, false], function(e, d)
-			that.handle.cmd('basic.qos', [that.channelName, 0, win, true], function()	{
+			that.handle.cmd('basic.qos', [that.channelName, 0, win, true], function () {
 				log.verbose(logPrefix + 'Set basic.qos for queue: "' + queueName + '" to ' + win);
 				returnObj.channel	= channel;
 				returnObj.method	= method;
 				returnObj.data	= data;
 
 				if (data !== undefined && data['consumer-tag'] !== undefined) {
-					consumerTag = data['consumer-tag'];
+					consumerTag	= data['consumer-tag'];
 				} else {
 					log.warn(logPrefix + 'No consumerTag obtained for queue: "' + queueName + '"');
 				}
@@ -788,7 +788,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 	msgUuid	= message.uuid;
 
 	try {
-		stringifiedMsg = JSON.stringify(message);
+		stringifiedMsg	= JSON.stringify(message);
 	} catch (err) {
 		log.warn(logPrefix + 'Could not stringify message. Message attached to next log call.');
 		log.warn(logPrefix + 'Unstringifiable message attached:', message);
@@ -896,7 +896,7 @@ Intercom.prototype.subscribe = function (options, msgCb, cb) {
 		options	= {};
 	}
 
-	options.type = 'subscribe';
+	options.type	= 'subscribe';
 
 	if (options.exchange === undefined) {
 		options.exchange	= 'default';

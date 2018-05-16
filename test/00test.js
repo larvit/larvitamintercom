@@ -30,9 +30,7 @@ before(function (done) {
 			tasks.push(function (cb) {
 				const	intercom	= new Intercom(config);
 				intercoms.push(intercom);
-				intercom.on('ready', function() {
-					cb();
-				});
+				intercom.on('ready', cb);
 			});
 		}
 
@@ -97,10 +95,10 @@ describe('Send and receive', function () {
 
 			function consume(intercom, cb) {
 				intercom.consume(function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+					assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 					delete msg.uuid;
-					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag should be non-empty');
+					assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+					assert(deliveryTag,	'deliveryTag should be non-empty');
 					consumed ++;
 					ack();
 				}, cb);
@@ -108,10 +106,10 @@ describe('Send and receive', function () {
 
 			function subscribe(intercom, cb) {
 				intercom.subscribe(function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+					assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 					delete msg.uuid;
-					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag should be non-empty');
+					assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+					assert(deliveryTag,	'deliveryTag should be non-empty');
 					subscribed ++;
 					ack();
 				}, cb);
@@ -152,10 +150,10 @@ describe('Send and receive', function () {
 
 			function consume(intercom, cb) {
 				intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+					assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false);
 					delete msg.uuid;
-					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag shoult be non-empty');
+					assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+					assert(deliveryTag,	'deliveryTag shoult be non-empty');
 					consumed ++;
 					ack();
 				}, cb);
@@ -163,10 +161,10 @@ describe('Send and receive', function () {
 
 			function subscribe(intercom, cb) {
 				intercom.subscribe({'exchange': exchange}, function (msg, ack, deliveryTag) {
-					assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+					assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false);
 					delete msg.uuid;
-					assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-					assert(deliveryTag, 'deliveryTag shoult be non-empty');
+					assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+					assert(deliveryTag,	'deliveryTag shoult be non-empty');
 					subscribed ++;
 					ack();
 				}, cb);
@@ -204,10 +202,10 @@ describe('Send and receive', function () {
 						orgMsg	= {'bi': 'bu'};
 
 					intercom[method][method]({'exchange': exchange}, function (msg, ack, deliveryTag) {
-						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+						assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false);
 						delete msg.uuid;
-						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-						assert(deliveryTag, 'deliveryTag shoult be non-empty');
+						assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+						assert(deliveryTag,	'deliveryTag shoult be non-empty');
 						ack();
 						cb();
 					}, function (err) {
@@ -223,34 +221,25 @@ describe('Send and receive', function () {
 			async.parallel(tasks, done);
 		});
 
-		//
-		//--------------------------------------------------------------------------------- ack test
-		//
-
+		// ack test
 		it('should get a message resend if closing a channel and opening up again without acking a received message', function (done) {
+			let	r	= undefined;
 
-			let r = undefined;
 			intercoms[20].consume({'exchange': 'xyzzy43'}, function (msg /*, ack */) {
 				//ack();
 
-				r = msg.foo;
-				intercoms[20].close(function(){
-
-					if(r === 17){
-						setTimeout(function() {
-
-							//intercoms[2].open(function(oerr) {
-							//	console.log('oerr=' + oerr);
+				r	= msg.foo;
+				intercoms[20].close(function () {
+					if (r === 17) {
+						setTimeout(function () {
 							intercoms[2].consume({'exchange': 'xyzzy43'}, function (msg, ack) {
-								assert(msg.foo, 17);
+								assert(msg.foo,	17);
 								ack();
 								done();
 							});
-							//});
 						}, 1500);
 					}
 				});
-
 			});
 
 			intercoms[3].send({foo: 17}, {'exchange': 'xyzzy43'}, function (err) {
@@ -260,60 +249,48 @@ describe('Send and receive', function () {
 			});
 		});
 
-
-		//
-		//--------------------------------------------------------------------------------- Squelch test
-		//
-
-
+		// Squelch test - limit amount of sent messages before receiving ack:s
 		it('should wait to send more messages when squelching is on', function (done) {
+			let	recieved	= 0,
+				tosend	= 12,
+				acks	= [];
 
-			let tosend = 12,
-				recieved = 0,
-				acks = [];
-
-			function send(x){
+			function send(x) {
 				intercoms[1].send(x, {'exchange': 'xyzzy'}, function (err) {
 					if (err) {
 						throw err;
 					}
-
 				});
 			}
 
-			function checkFinished(){
-				setTimeout(function(){
+			function checkFinished() {
+				setTimeout(function () {
 					assert(recieved,  6);
-					acks.forEach(function(ack){
+					acks.forEach(function (ack) {
 						ack();
 					});
-					setTimeout(function() {
+					setTimeout(function () {
 						done();
 					}, 250);
-					//})
 				}, 100);
 			}
 
 			intercoms[4].consume({'exchange': 'xyzzy'}, function (msg, ack) {
 				recieved ++;
 				acks.push(ack);
-				if(recieved === 6){
+				if (recieved === 6) {
 					checkFinished();
 				}
 			});
 
-			setTimeout(function(){
-				let count = tosend;
-				while(count -- > 0){
+			setTimeout(function () {
+				let	count	= tosend;
+
+				while (count -- > 0) {
 					send({foo: count});
 				}
 			}, 1500);
-
-
 		});
-
-
-
 
 		it('send and receive multiple messages on different Intercoms', function (done) {
 			const	tasks	= [],
@@ -532,10 +509,10 @@ describe('Send and receive', function () {
 				orgMsg	= {'fooconsume': 'barconsume'};
 
 			intercom.consume(function (msg, ack, deliveryTag) {
-				assert.notStrictEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				assert.notStrictEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 				delete msg.uuid;
-				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-				assert(deliveryTag, 'deliveryTag should be non-empty');
+				assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+				assert(deliveryTag,	'deliveryTag should be non-empty');
 				ack();
 				done();
 			}, function (err) {
@@ -543,7 +520,7 @@ describe('Send and receive', function () {
 			});
 
 			intercom.send(orgMsg, function (err, msgUuid) {
-				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 
 				if (err) throw err;
 			});
@@ -554,10 +531,10 @@ describe('Send and receive', function () {
 				orgMsg	= {'foosubscribe': 'barsubscribe'};
 
 			intercom.subscribe(function (msg, ack, deliveryTag) {
-				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 				delete msg.uuid;
-				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-				assert(deliveryTag, 'deliveryTag should be non-empty');
+				assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+				assert(deliveryTag,	'deliveryTag should be non-empty');
 				ack();
 				done();
 			}, function (err) {
@@ -583,10 +560,10 @@ describe('Send and receive', function () {
 			});
 
 			intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
-				assert.notStrictEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				assert.notStrictEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 				delete msg.uuid;
-				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-				assert(deliveryTag, 'deliveryTag should be non-empty');
+				assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+				assert(deliveryTag,	'deliveryTag should be non-empty');
 				ack();
 				setTimeout(done, 20);
 			}, function (err) {
@@ -594,7 +571,7 @@ describe('Send and receive', function () {
 			});
 
 			intercom.send(orgMsg, {'exchange': exchange}, function (err, msgUuid) {
-				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 
 				if (err) throw err;
 			});
@@ -612,10 +589,10 @@ describe('Send and receive', function () {
 			});
 
 			intercom.subscribe({'exchange': exchange}, function (msg, ack, deliveryTag) {
-				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 				delete msg.uuid;
-				assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-				assert(deliveryTag, 'deliveryTag should be non-empty');
+				assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+				assert(deliveryTag,	'deliveryTag should be non-empty');
 				ack();
 				setTimeout(done, 20);
 			}, function (err) {
@@ -623,7 +600,7 @@ describe('Send and receive', function () {
 			});
 
 			intercom.send(orgMsg, {'exchange': exchange}, function (err, msgUuid) {
-				assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+				assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 
 				if (err) throw err;
 			});
@@ -642,7 +619,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercom.subscribe({'exchange': exchange1}, function (msg, ack) {
-					assert.deepStrictEqual(msg.bar, orgMsg1.bar);
+					assert.deepStrictEqual(msg.bar,	orgMsg1.bar);
 					receivedMsg1 ++;
 					ack();
 				}, cb);
@@ -650,7 +627,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercom.subscribe({'exchange': exchange2}, function (msg, ack) {
-					assert.deepStrictEqual(msg.waffer, orgMsg2.waffer);
+					assert.deepStrictEqual(msg.waffer,	orgMsg2.waffer);
 					receivedMsg2 ++;
 					ack();
 				}, cb);
@@ -658,7 +635,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercom.send(orgMsg1, {'exchange': exchange1}, function (err, msgUuid) {
-					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 					if (err) throw err;
 					cb(err);
 				});
@@ -666,7 +643,7 @@ describe('Send and receive', function () {
 
 			tasks.push(function (cb) {
 				intercom.send(orgMsg2, {'exchange': exchange2}, function (err, msgUuid) {
-					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 					if (err) throw err;
 					cb(err);
 				});
@@ -694,7 +671,7 @@ describe('Send and receive', function () {
 				actualSum	= 0;
 
 			intercom.subscribe(function (msg, ack, deliveryTag) {
-				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 
 				actualSum += msg.thisNr;
 				receivedMsgs	++;
@@ -716,7 +693,7 @@ describe('Send and receive', function () {
 				expectedSum	+= thisNr;
 
 				intercom.send({'thisNr': thisNr}, function (err, msgUuid) {
-					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 
 					if (err) throw err;
 				});
@@ -731,7 +708,7 @@ describe('Send and receive', function () {
 				actualSum	= 0;
 
 			intercom.consume(function (msg, ack, deliveryTag) {
-				assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false, 'msg.uuid must be a valid uuid');
+				assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false,	'msg.uuid must be a valid uuid');
 
 				actualSum += msg.thisNr;
 				receivedMsgs	++;
@@ -753,7 +730,7 @@ describe('Send and receive', function () {
 				expectedSum	+= thisNr;
 
 				intercom.send({'thisNr': thisNr}, function (err, msgUuid) {
-					assert.notStrictEqual(lUtils.formatUuid(msgUuid), false, 'msg.uuid must be a valid uuid');
+					assert.notStrictEqual(lUtils.formatUuid(msgUuid),	false,	'msg.uuid must be a valid uuid');
 
 					if (err) throw err;
 				});
@@ -773,10 +750,10 @@ describe('Send and receive', function () {
 
 				setTimeout(function () {
 					intercom.consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
-						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
+						assert.notDeepEqual(lUtils.formatUuid(msg.uuid),	false);
 						delete msg.uuid;
-						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
-						assert(deliveryTag, 'deliveryTag shoult be non-empty');
+						assert.deepStrictEqual(JSON.stringify(orgMsg),	JSON.stringify(msg));
+						assert(deliveryTag,	'deliveryTag shoult be non-empty');
 						ack();
 						done();
 					}, function (err) {
