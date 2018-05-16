@@ -8,12 +8,9 @@ const	intercoms	= [],
 	log	= require('winston'),
 	fs	= require('fs');
 
-let	confFile,
-	conStr;
-
 // Set up winston
 log.remove(log.transports.Console);
-/**/log.add(log.transports.Console, {
+/** /log.add(log.transports.Console, {
 	'colorize':	true,
 	'timestamp':	true,
 	'level':	'debug',
@@ -21,8 +18,9 @@ log.remove(log.transports.Console);
 });
 /**/
 
-
 before(function (done) {
+	const	confFilePath	= __dirname + '/../config/amqp_test.json';
+
 	this.timeout(20000);
 
 	function instantiateIntercoms(config) {
@@ -39,42 +37,20 @@ before(function (done) {
 		}
 
 		// Wait until all is connected and ready
-		// Wait until all is connected and ready
 		async.parallel(tasks, done);
 	}
 
-	if (process.env.CONSTR === undefined) {
-		confFile	= __dirname + '/../config/amqp_test.json';
+	if (fs.existsSync(confFilePath)) {
+		log.verbose('Autobahn using config file: "' + confFilePath + '"');
+		instantiateIntercoms(require(confFilePath));
+	} else if (process.env.CONSTR) {
+		log.verbose('Autobahn using ENV CONSTR');
+		instantiateIntercoms(process.env.CONSTR);
 	} else {
-		conStr	= process.env.CONSTR;
+		const	err	= new Error('Both config file "config/amqp_test.json" and ENV variable CONSTR is missing, cannot start');
+		log.error('Autobahn ' + err.message);
+		throw err;
 	}
-
-	if (conStr !== undefined) {
-		log.verbose('Autobahn using environment CONSTR');
-		instantiateIntercoms(conStr);
-		return;
-	}
-
-	log.verbose('Autobahn config file: "' + confFile + '"');
-
-	// First look for absolute path
-	fs.stat(confFile, function (err) {
-		if (err) {
-
-			// Then look for this string in the config folder
-			confFile = __dirname + '/../config/' + confFile;
-			fs.stat(confFile, function (err) {
-				if (err) throw err;
-				log.verbose('Autobahn config: ' + JSON.stringify(require(confFile)));
-				instantiateIntercoms(require(confFile));
-			});
-
-			return;
-		}
-
-		log.verbose('Autobahn config: ' + JSON.stringify(require(confFile)));
-		instantiateIntercoms(require(confFile));
-	});
 });
 
 /*after(function (done) {
