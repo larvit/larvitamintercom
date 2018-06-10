@@ -253,7 +253,7 @@ function Intercom(conStr) {
 						okTimeout = setTimeout(function () {
 							const	err	= new Error('no answer received from queue within 10s');
 							log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
-							callCb = false;
+							callCb	= false;
 							cb(err);
 						}, 10000);
 
@@ -406,10 +406,10 @@ Intercom.prototype.consume = function (options, msgCb, cb) {
 	}
 
 	if (options.exclusive !== true && options.exclusive !== false) {
-		options.exclusive = false;
+		options.exclusive	= false;
 	}
 
-	options.type = 'consume';
+	options.type	= 'consume';
 
 	if (options.exchange === undefined) {
 		options.exchange	= 'default';
@@ -512,7 +512,6 @@ Intercom.prototype.declareQueue = function (options, cb) {
 	queueKey += JSON.stringify(args);
 
 	if (autoDelete === false && that.declaredQueues[queueKey] === true) return cb(null, options.queueName);
-	that.declaredQueues[queueKey]	= true;
 
 	log.verbose(logPrefix + 'Declaring');
 
@@ -529,6 +528,7 @@ Intercom.prototype.declareQueue = function (options, cb) {
 				return cb(err);
 			}
 
+			that.declaredQueues[queueKey]	= true;
 			queueName	= data.queue;
 			log.silly(logPrefix + 'Declared!');
 			cb(err, queueName);
@@ -569,7 +569,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	let	queueName;
 
 	if (cb === undefined) {
-		cb = function () {};
+		cb	= function () {};
 	}
 
 	if (options.exchange === undefined) {
@@ -577,7 +577,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 	}
 
 	if (options.type === 'subscribe') {
-		options.exclusive = false;
+		options.exclusive	= false;
 	}
 
 	queueName	= 'queTo_' + options.exchange;
