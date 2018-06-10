@@ -339,7 +339,6 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 		that	= this;
 
 	if (that.boundQueues[queueName + '___' + exchange] === true) return cb();
-	that.boundQueues[queueName + '___' + exchange]	= true;
 
 	log.verbose(logPrefix + 'Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
@@ -353,6 +352,7 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 				log.error(logPrefix + 'Could not bind queue: "' + queueName + '" to exchange: "' + exchange + '", err: ' + err.message);
 			}
 
+			that.boundQueues[queueName + '___' + exchange]	= true;
 			log.silly(logPrefix + 'Bound queue "' + queueName + '" to exchange "' + exchange + '"');
 
 			cb(err);
