@@ -511,11 +511,19 @@ Intercom.prototype.declareQueue = function (options, cb) {
 	queueKey += String(durable);
 	queueKey += JSON.stringify(args);
 
-	if (autoDelete === false && that.declaredQueues[queueKey] === true) return cb(null, options.queueName);
+	if (autoDelete === false && that.declaredQueues[queueKey] === true && options.queueName !== '') {
+		return cb(null, options.queueName);
+	}
 
 	log.verbose(logPrefix + 'Declaring');
 
-	if (that.loopback === true) return cb(null, options.queueName);
+	if (that.loopback === true) {
+		if (options.queueName === '') {
+			options.queueName	= 'amq.gen-' + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2) + Math.random().toString(36).substring(10);
+		}
+
+		return cb(null, options.queueName);
+	}
 
 	that.ready(function (err) {
 		if (err) return cb(err);
@@ -528,7 +536,9 @@ Intercom.prototype.declareQueue = function (options, cb) {
 				return cb(err);
 			}
 
-			that.declaredQueues[queueKey]	= true;
+			if (options.queueName !== '') {
+				that.declaredQueues[queueKey]	= true;
+			}
 			queueName	= data.queue;
 			log.silly(logPrefix + 'Declared!');
 			cb(err, queueName);
@@ -625,7 +635,14 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 			that.declareQueue({'queueName': queueName}, cb);
 		} else if (options.type === 'subscribe') {
 			that.declareQueue({'exclusive': true}, function (err, result) {
-				queueName = result;
+				queueName	= result;
+
+				if ( ! queueName) {
+					const	err	= new Error('Did not get a queueName from AMQP server when trying that.declareQueue');
+					log.error(logPrefix + err.message);
+					return cb(err);
+				}
+
 				cb(err);
 			});
 		} else {

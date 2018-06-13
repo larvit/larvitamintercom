@@ -27,7 +27,7 @@ before(function (done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 27; i ++) {
+		for (let i = 0; i < 28; i ++) {
 			tasks.push(function (cb) {
 				const	intercom	= new Intercom(config);
 				intercoms.push(intercom);
@@ -421,6 +421,32 @@ describe('Send and receive', function () {
 			async.parallel(tasks, done);
 		});
 
+		it('declare two queues with random name', function (done) {
+			const	intercom	= intercoms[23];
+
+			let	randQueueName1,
+				randQueueName2;
+
+			intercom.declareQueue({}, function (err, queueName) {
+				if (err) throw err;
+
+				assert.notStrictEqual(queueName,	'');
+
+				randQueueName1	= queueName;
+
+				intercom.declareQueue({}, function (err, queueName) {
+					if (err) throw err;
+
+					randQueueName2	= queueName;
+
+					assert.notStrictEqual(queueName,	'');
+					assert.notStrictEqual(randQueueName1,	randQueueName2);
+
+					done();
+				});
+			});
+		});
+
 		it('send and receive messages on different exchanges', function (done) {
 			const	exchange1	= 'differentExes1',
 				exchange2	= 'differentExes2',
@@ -432,7 +458,7 @@ describe('Send and receive', function () {
 				receivedMsg2	= 0;
 
 			tasks.push(function (cb) {
-				intercoms[23].subscribe({'exchange': exchange1}, function (msg, ack) {
+				intercoms[24].subscribe({'exchange': exchange1}, function (msg, ack) {
 					assert.deepStrictEqual(msg.bar, orgMsg1.bar);
 					receivedMsg1 ++;
 					ack();
@@ -440,7 +466,7 @@ describe('Send and receive', function () {
 			});
 
 			tasks.push(function (cb) {
-				intercoms[23].subscribe({'exchange': exchange2}, function (msg, ack) {
+				intercoms[24].subscribe({'exchange': exchange2}, function (msg, ack) {
 					assert.deepStrictEqual(msg.waffer, orgMsg2.waffer);
 					receivedMsg2 ++;
 					ack();
@@ -448,11 +474,11 @@ describe('Send and receive', function () {
 			});
 
 			tasks.push(function (cb) {
-				intercoms[23].send(orgMsg1, {'exchange': exchange1}, cb);
+				intercoms[24].send(orgMsg1, {'exchange': exchange1}, cb);
 			});
 
 			tasks.push(function (cb) {
-				intercoms[23].send(orgMsg2, {'exchange': exchange2}, cb);
+				intercoms[24].send(orgMsg2, {'exchange': exchange2}, cb);
 			});
 
 			async.series(tasks, function (err) {
@@ -476,11 +502,11 @@ describe('Send and receive', function () {
 			this.timeout(2000);
 			this.slow(200);
 
-			intercoms[24].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function (err) {
+			intercoms[25].send(orgMsg, {'exchange': exchange, 'forceConsumeQueue': true}, function (err) {
 				if (err) throw err;
 
 				setTimeout(function () {
-					intercoms[25].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
+					intercoms[26].consume({'exchange': exchange}, function (msg, ack, deliveryTag) {
 						assert.notDeepEqual(lUtils.formatUuid(msg.uuid), false);
 						delete msg.uuid;
 						assert.deepStrictEqual(JSON.stringify(orgMsg), JSON.stringify(msg));
@@ -496,7 +522,7 @@ describe('Send and receive', function () {
 		});
 
 		it('send and declare exchanges at the same time', function (done) {
-			const	intercom	= intercoms[26],
+			const	intercom	= intercoms[27],
 				exchange	= 'breakCmdChain',
 				orgMsg1	= {'blippel': 'bloppel'},
 				orgMsg2	= {'maffab': 'berk'};
