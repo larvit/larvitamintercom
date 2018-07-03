@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -29,7 +29,7 @@
     "larvitutils": "^1.1.0",
     "lodash": "^4.17.4",
     "uuid": "^3.0.0",
-    "winston": "^3.0.0"
+    "winston": "^2.4.3"
   },
   "devDependencies": {
     "eslint": "^4.19.1",
