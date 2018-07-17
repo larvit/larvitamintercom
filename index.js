@@ -340,7 +340,7 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 
 	if (that.boundQueues[queueName + '___' + exchange] === true) return cb();
 
-	log.verbose(logPrefix + 'Binding queue "' + queueName + '" to exchange "' + exchange + '"');
+	log.debug(logPrefix + 'Binding queue "' + queueName + '" to exchange "' + exchange + '"');
 
 	if (that.loopback === true) return cb();
 
@@ -461,7 +461,7 @@ Intercom.prototype.declareExchange = function (exchangeName, cb) {
 			return cb();
 		}
 
-		log.verbose(logPrefix + 'Declaring');
+		log.debug(logPrefix + 'Declaring');
 
 		that.handle.cmd('exchange.declare', [that.channelName, exchangeName, exchangeType, passive, durable, autoDelete, internal, noWait, args], function (err) {
 			if (err) {
@@ -515,7 +515,7 @@ Intercom.prototype.declareQueue = function (options, cb) {
 		return cb(null, options.queueName);
 	}
 
-	log.verbose(logPrefix + 'Declaring');
+	log.debug(logPrefix + 'Declaring');
 
 	if (that.loopback === true) {
 		if (options.queueName === '') {
