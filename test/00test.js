@@ -2,22 +2,12 @@
 
 const	intercoms	= [],
 	Intercom	= require(__dirname + '/../index.js'),
-	//uuidLib	= require('uuid'),
 	assert	= require('assert'),
-	lUtils	= require('larvitutils'),
+	LUtils	= require('larvitutils'),
+	lUtils	= new LUtils(),
 	async	= require('async'),
-	log	= require('winston'),
+	log	= new lUtils.Log(),
 	fs	= require('fs');
-
-// Set up winston
-log.remove(log.transports.Console);
-/** /log.add(log.transports.Console, {
-	'colorize':	true,
-	'timestamp':	true,
-	'level':	'debug',
-	'json':	false
-});
-/**/
 
 before(function (done) {
 	const	confFilePath	= __dirname + '/../config/amqp_test.json';
@@ -27,7 +17,14 @@ before(function (done) {
 	function instantiateIntercoms(config) {
 		const	tasks	= [];
 
-		for (let i = 0; i < 28; i ++) {
+		// Use custom logging on the first one
+		tasks.push(function (cb) {
+			const	intercom	= new Intercom({'conStr': config, 'log': log});
+			intercoms.push(intercom);
+			intercom.on('ready', cb);
+		});
+
+		for (let i = 1; i < 28; i ++) {
 			tasks.push(function (cb) {
 				const	intercom	= new Intercom(config);
 				intercoms.push(intercom);

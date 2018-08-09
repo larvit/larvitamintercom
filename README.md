@@ -108,3 +108,13 @@ intercom.subscribe(options, function (message, ack, deliveryTag) {
 	'exchange':	'default'
 }
 ```
+
+### Custom logging
+
+```javascript
+const	Intercom	= require('larvitamintercom').Intercom,
+	winston	= require('winston'),
+	log	= winston.createLogger({'transports': [new winston.transports.Console()]}),
+	conStr	= 'amqp://user:password@192.168.0.1/',
+	intercom	= new Intercom({'conStr': conStr, 'log': log});
+```

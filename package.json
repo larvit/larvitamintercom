@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "0.2.14",
+  "version": "0.3.0",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -15,7 +15,7 @@
     {
       "name": "Lillem4n",
       "email": "lilleman@larvit.se",
-      "url": "larvit.se"
+      "url": "https://larvit.se"
     }
   ],
   "license": "ISC",
@@ -28,8 +28,7 @@
     "bramqp": "^0.6.0",
     "larvitutils": "^2.0.0",
     "lodash": "^4.17.4",
-    "uuid": "^3.0.0",
-    "winston": "^2.4.3"
+    "uuid": "^3.0.0"
   },
   "devDependencies": {
     "eslint": "5.3.0",
