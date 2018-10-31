@@ -158,7 +158,7 @@ function Intercom(options) {
 					message = JSON.parse(content.toString());
 				} catch (err) {
 					that.log.warn(logPrefix + 'subscribe() - Could not parse incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
-					return cb(err);
+					return;
 				}
 
 				if (lUtils.formatUuid(message.uuid) === false) {
