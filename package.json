@@ -31,7 +31,7 @@
     "uuid": "^3.0.0"
   },
   "devDependencies": {
-    "eslint": "5.4.0",
+    "eslint": "5.9.0",
     "eslint-config-google": "0.9.1",
     "eslint-plugin-html": "4.0.5",
     "eslint-plugin-import": "2.14.0",
