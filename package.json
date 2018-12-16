@@ -36,6 +36,6 @@
     "eslint-plugin-html": "5.0.0",
     "eslint-plugin-import": "2.14.0",
     "mocha": "5.2.0",
-    "mocha-eslint": "4.1.0"
+    "mocha-eslint": "5.0.0"
   }
 }
