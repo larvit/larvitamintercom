@@ -68,35 +68,47 @@ function Intercom(options) {
 		that.host	= parsedConStr.hostname;
 		that.port	= parsedConStr.port || 5672;
 
-		that.socket = net.connect({
-			'port': that.port,
-			'host':	that.host
-		});
+		function openSocket() {
+			let connectionOptions = {
+				'port': that.port,
+				'host':	that.host
+			};
 
-		that.log.verbose(logPrefix + 'Initializing on ' + that.host + ':' + that.port);
+			that.log.info(logPrefix + 'Initializing socket on ' + that.host + ':' + that.port);
 
-		that.socket.on('error', function (err) {
-			if (that.expectingClose !== false) {
-				that.log.verbose(logPrefix + 'expected socket close, but also got socket error: ' + err.message);
-			} else {
-				that.log.error(logPrefix + 'socket error: ' + err.message);
-			}
-		});
+			that.socket = net.connect(connectionOptions);
+			that.socket.setKeepAlive = true;
 
-		that.socket.on('close', function (err) {
-			that.log.verbose(logPrefix + 'socket closed');
-			if (err) {
+			that.socket.on('connect', function () {
+				that.log.verbose(logPrefix + 'Socket connected to ' + that.host + ':' + that.port);
+			});
+
+			that.socket.on('error', function (err) {
+				if (that.expectingClose !== false) {
+					that.log.verbose(logPrefix + 'expected socket close, but also got socket error: ' + err.message);
+				} else {
+					that.log.error(logPrefix + 'socket error: ' + err.message);
+				}
+			});
+
+			that.socket.on('close', function (err) {
+				that.socket.destroy();
+				that.socket.unref();
+
 				if (that.expectingClose !== false) {
 					that.log.verbose(logPrefix + 'socket closed with error, err: ' + err.message);
 				} else {
 					that.log.error(logPrefix + 'socket closed with error, err: ' + err.message);
+					setTimeout(openSocket, 1000);
 				}
-			}
-		});
+			});
 
-		that.socket.on('end', function () {
-			that.log.info(logPrefix + 'socket connection ended by remote');
-		});
+			that.socket.on('end', function () {
+				that.log.info(logPrefix + 'socket connection ended by remote');
+			});
+		}
+
+		openSocket();
 
 		// Create handle by socket connect to rabbitmq
 		tasks.push(function (cb) {
