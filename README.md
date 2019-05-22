@@ -6,6 +6,9 @@ Communication wrapper for rabbitmq in autobahn.
 
 ## Usage
 
+### Connection
+When instantiating a new intercom it will try to connect instantly and on connection error or connection lost it will try to reconnect an infinite number of times every 1sec.
+
 ### Send
 
 send() to autobahn.
