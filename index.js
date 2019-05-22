@@ -26,8 +26,7 @@ const	EventEmitter	= require('events').EventEmitter,
  * @param obj options - {'conStr': 'see above', 'log': instance of log object}
  */
 function Intercom(options) {
-	const	tasks	= [],
-		that	= this;
+	const that	= this;
 
 	let	logPrefix	= topLogPrefix + 'Intercom() - ',
 		parsedConStr;
@@ -63,6 +62,8 @@ function Intercom(options) {
 		that.handle	= new EventEmitter;
 
 		that.log.verbose(logPrefix + 'Initializing on loopback interface');
+
+		that.initializeListeners();
 	} else {
 		that.loopback	= false;
 		that.host	= parsedConStr.hostname;
