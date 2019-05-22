@@ -76,11 +76,22 @@ function Intercom(options) {
 
 			that.log.info(logPrefix + 'Initializing socket on ' + that.host + ':' + that.port);
 
+
 			that.socket = net.connect(connectionOptions);
+
+
 			that.socket.setKeepAlive = true;
 
 			that.socket.on('connect', function () {
 				that.log.verbose(logPrefix + 'Socket connected to ' + that.host + ':' + that.port);
+
+				onSocketConnect(function (err) {
+					if (err) {
+						that.log.error(logPrefix + ' Couldn\'t Initialize connection to rabbitmq');
+					}
+
+					that.initializeListeners();
+				});
 			});
 
 			that.socket.on('error', function (err) {
@@ -108,247 +119,270 @@ function Intercom(options) {
 			});
 		}
 
+		function onSocketConnect(cb) {
+			const tasks = [];
+
+			// Create handle by socket connect to rabbitmq
+			tasks.push(function (cb) {
+				bramqp.initialize(that.socket, 'rabbitmq/full/amqp0-9-1.stripped.extended', function (err, result) {
+					if (err) {
+						that.log.error(logPrefix + 'Error connecting to ' + that.host + ':' + that.port + ' err: ' + err.message);
+						that.emit('error', err);
+					}
+
+					// log.silly(logPrefix + 'bramqp.initialize() ran on ' + that.host + ':' + that.port);
+
+					that.handle	= result;
+
+					cb(err);
+				});
+			});
+
+			// Open AMQP communication
+			tasks.push(function (cb) {
+				const	heartBeat	= true,
+					auth	= parsedConStr.auth;
+
+				let	username,
+					password;
+
+				if (auth) {
+					username	= parsedConStr.auth.split(':')[0];
+					password	= parsedConStr.auth.split(':')[1];
+				}
+
+				that.log.debug(logPrefix + 'openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
+
+				that.handle.openAMQPCommunication(username, password, heartBeat, function (err) {
+					if (err) {
+						that.log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
+						that.emit('error', err);
+					}
+
+					cb(err);
+				});
+			});
+
+			async.series(tasks, function (err) {
+				if (err) return cb(err);
+				cb();
+			});
+		};
+
 		openSocket();
-
-		// Create handle by socket connect to rabbitmq
-		tasks.push(function (cb) {
-			bramqp.initialize(that.socket, 'rabbitmq/full/amqp0-9-1.stripped.extended', function (err, result) {
-				if (err) {
-					that.log.error(logPrefix + 'Error connecting to ' + that.host + ':' + that.port + ' err: ' + err.message);
-					that.emit('error', err);
-				}
-
-				// log.silly(logPrefix + 'bramqp.initialize() ran on ' + that.host + ':' + that.port);
-
-				that.handle	= result;
-
-				cb(err);
-			});
-		});
-
-		// Open AMQP communication
-		tasks.push(function (cb) {
-			const	heartBeat	= true,
-				auth	= parsedConStr.auth;
-
-			let	username,
-				password;
-
-			if (auth) {
-				username	= parsedConStr.auth.split(':')[0];
-				password	= parsedConStr.auth.split(':')[1];
-			}
-
-			that.log.debug(logPrefix + 'openAMQPCommunication running on ' + that.host + ':' + that.port + ' with username: ' + username);
-
-			that.handle.openAMQPCommunication(username, password, heartBeat, function (err) {
-				if (err) {
-					that.log.error(logPrefix + 'Error opening AMQP communication: ' + err.message);
-					that.emit('error', err);
-				}
-
-				cb(err);
-			});
-		});
 	}
 
-	// Register listener for incoming messages
-	tasks.push(function (cb) {
-		that.handle.on(that.channelName + ':basic.deliver', function (channel, method, data) {
-			const	exchange	= data.exchange,
-				deliveryTag	= data['delivery-tag'],
-				consumerTag	= data['consumer-tag'];
 
-			// log.silly(logPrefix + 'Incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '"');
+	Intercom.prototype.initializeListeners = function () {
+		const tasks = [],
+			that = this;
 
-			that.handle.once('content', function (channel, className, properties, content) {
-				let	message;
+		// Register listener for incoming messages
+		tasks.push(function (cb) {
+			that.handle.on(that.channelName + ':basic.deliver', function (channel, method, data) {
+				const	exchange	= data.exchange,
+					deliveryTag	= data['delivery-tag'],
+					consumerTag	= data['consumer-tag'];
 
-				// log.silly(logPrefix + 'Incoming message content. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+				// log.silly(logPrefix + 'Incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '"');
 
-				try {
-					message = JSON.parse(content.toString());
-				} catch (err) {
-					that.log.warn(logPrefix + 'subscribe() - Could not parse incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+				that.handle.once('content', function (channel, className, properties, content) {
+					let	message;
+
+					// log.silly(logPrefix + 'Incoming message content. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+
+					try {
+						message = JSON.parse(content.toString());
+					} catch (err) {
+						that.log.warn(logPrefix + 'subscribe() - Could not parse incoming message. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+						return;
+					}
+
+					if (lUtils.formatUuid(message.uuid) === false) {
+						that.log.warn(logPrefix + 'consume() - Message does not contain uuid. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
+					}
+
+					that.emit('incoming_msg_' + exchange, message, deliveryTag);
+				});
+			});
+			cb();
+		});
+
+
+		tasks.push(function (cb) {
+			that.handle.on('error', function (err) {
+				that.log.error(logPrefix + 'RabbitMQ connection error :' + err.message);
+			});
+			cb();
+		});
+
+		// Register listener for close events
+		tasks.push(function (cb) {
+			that.handle.on('connection.close', function (channel, method, data) {
+				if (that.expectingClose === false) {
+					that.log.error(logPrefix + 'Unexpected connection.close! channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
+				} else {
+					that.log.info(logPrefix + 'Expected connetion.close. channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
+				}
+			});
+			cb();
+		});
+
+		// Log all handle events
+		// Should be disabled in production code and only manually enabled while debugging due to it being expensive
+		/** /tasks.push(function (cb) {
+			const	oldEmitter	= that.handle.emit;
+
+			that.handle.emit = function () {
+				const	emitArgs	= arguments;
+
+				that.log.silly(topLogPrefix + 'handle.on("' + arguments[0] + '"), all arguments: "' + JSON.stringify(arguments) + '"');
+
+				oldEmitter.apply(that.handle, arguments);
+			}
+
+			cb();
+		});/**/
+
+		// Construct generic handle comms
+		tasks.push(function (cb) {
+			const	cmdStrsWithoutOk	= ['basic.publish', 'content', 'closeAMQPCommunication', 'basic.nack', 'basic.ack', 'basic.qos'];
+
+			that.handle.cmd = function cmd(cmdStr, params, cb) {
+				if (typeof cb !== 'function') {
+					cb = function () {};
+				}
+
+				that.cmdQueue.push({'cmdStr': cmdStr, 'params': params, 'cb': cb});
+
+				// log.silly(logPrefix + 'handle.cmd() - cmdStr: "' + cmdStr + '" added to run queue. params: "' + JSON.stringify(params) + '"');
+
+				if (that.cmdInProgress === true) {
+					// log.silly(logPrefix + 'handle.cmd() - cmdStr: "' + cmdStr + '" cmdInProgress === true');
 					return;
 				}
 
-				if (lUtils.formatUuid(message.uuid) === false) {
-					that.log.warn(logPrefix + 'consume() - Message does not contain uuid. exchange: "' + exchange + '", consumerTag: "' + consumerTag + '", deliveryTag: "' + deliveryTag + '", content: "' + content.toString() + '"');
-				}
+				// log.silly(logPrefix + 'handle.cmd() - cmdStr: "' + cmdStr + '" cmdInProgress !== true');
 
-				that.emit('incoming_msg_' + exchange, message, deliveryTag);
-			});
-		});
-		cb();
-	});
+				that.cmdInProgress = true;
 
-	// Register listener for close events
-	tasks.push(function (cb) {
-		that.handle.on('connection.close', function (channel, method, data) {
-			if (that.expectingClose === false) {
-				that.log.error(logPrefix + 'Unexpected connection.close! channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
-			} else {
-				that.log.info(logPrefix + 'Expected connetion.close. channel: "' + channel + '" data: "' + JSON.stringify(data) + '"');
-			}
-		});
-		cb();
-	});
+				function readFromQueue() {
+					const	mainParams	= that.cmdQueue.shift(),
+						cmdStr	= mainParams.cmdStr,
+						tasks	= [],
+						cb	= mainParams.cb;
 
-	// Log all handle events
-	// Should be disabled in production code and only manually enabled while debugging due to it being expensive
-	/** /tasks.push(function (cb) {
-		const	oldEmitter	= that.handle.emit;
+					let	params	= mainParams.params,
+						channel,
+						method,
+						data;
 
-		that.handle.emit = function () {
-			const	emitArgs	= arguments;
+					if ( ! Array.isArray(params)) {
+						params = [];
+					}
 
-			that.log.silly(topLogPrefix + 'handle.on("' + arguments[0] + '"), all arguments: "' + JSON.stringify(arguments) + '"');
+					// Register the callback
+					tasks.push(function (cb) {
+						const	cmdGroupName	= cmdStr.split('.')[0],
+							cmdName	= cmdStr.split('.')[1];
 
-			oldEmitter.apply(that.handle, arguments);
-		}
+						let	callCb	= true,
+							okTimeout;
 
-		cb();
-	});/**/
+						function cmdCb(err) {
+							if (err) {
+								that.log.error(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
+								callCb = false;
+								return cb(err);
+							}
 
-	// Construct generic handle comms
-	tasks.push(function (cb) {
-		const	cmdStrsWithoutOk	= ['basic.publish', 'content', 'closeAMQPCommunication', 'basic.nack', 'basic.ack', 'basic.qos'];
+							// log.silly(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
 
-		that.handle.cmd = function cmd(cmdStr, params, cb) {
-			if (typeof cb !== 'function') {
-				cb = function () {};
-			}
-
-			that.cmdQueue.push({'cmdStr': cmdStr, 'params': params, 'cb': cb});
-
-			// log.silly(logPrefix + 'handle.cmd() - cmdStr: "' + cmdStr + '" added to run queue. params: "' + JSON.stringify(params) + '"');
-
-			if (that.cmdInProgress === true) {
-				// log.silly(logPrefix + 'handle.cmd() - cmdStr: "' + cmdStr + '" cmdInProgress === true');
-				return;
-			}
-
-			// log.silly(logPrefix + 'handle.cmd() - cmdStr: "' + cmdStr + '" cmdInProgress !== true');
-
-			that.cmdInProgress = true;
-
-			function readFromQueue() {
-				const	mainParams	= that.cmdQueue.shift(),
-					cmdStr	= mainParams.cmdStr,
-					tasks	= [],
-					cb	= mainParams.cb;
-
-				let	params	= mainParams.params,
-					channel,
-					method,
-					data;
-
-				if ( ! Array.isArray(params)) {
-					params = [];
-				}
-
-				// Register the callback
-				tasks.push(function (cb) {
-					const	cmdGroupName	= cmdStr.split('.')[0],
-						cmdName	= cmdStr.split('.')[1];
-
-					let	callCb	= true,
-						okTimeout;
-
-					function cmdCb(err) {
-						if (err) {
-							that.log.error(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" failed, err: ' + err.message);
-							callCb = false;
-							return cb(err);
+							if (cmdStrsWithoutOk.indexOf(cmdStr) !== - 1) {
+								return cb();
+							}
 						}
 
-						// log.silly(logPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" succeeded');
-
-						if (cmdStrsWithoutOk.indexOf(cmdStr) !== - 1) {
+						if (that.loopback === true) {
 							return cb();
 						}
-					}
 
-					if (that.loopback === true) {
-						return cb();
-					}
+						if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1 && that.loopback === false) {
+							okTimeout = setTimeout(function () {
+								const	err	= new Error('no answer received from queue within 10s');
+								that.log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
+								callCb	= false;
+								cb(err);
+							}, 10000);
 
-					if (cmdStrsWithoutOk.indexOf(cmdStr) === - 1 && that.loopback === false) {
-						okTimeout = setTimeout(function () {
-							const	err	= new Error('no answer received from queue within 10s');
-							that.log.error(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", ' + err.message);
-							callCb	= false;
-							cb(err);
-						}, 10000);
+							that.handle.once(that.channelName + ':' + cmdStr + '-ok', function (x, y, z) {
+								// We want these in the outer scope, thats why the weird naming
+								channel	= x;
+								method	= y;
+								data	= z;
 
-						that.handle.once(that.channelName + ':' + cmdStr + '-ok', function (x, y, z) {
-							// We want these in the outer scope, thats why the weird naming
-							channel	= x;
-							method	= y;
-							data	= z;
+								// log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
+								if (callCb === false) {
+									that.log.warn(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received but to late; timeout have already happened');
+									return;
+								}
+								clearTimeout(okTimeout);
+								cb();
+							});
+						}
 
-							// log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received from queue');
-							if (callCb === false) {
-								that.log.warn(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '", answer received but to late; timeout have already happened');
-								return;
-							}
-							clearTimeout(okTimeout);
-							cb();
-						});
-					}
+						params.push(cmdCb);
 
-					params.push(cmdCb);
+						if (cmdName) {
+							that.handle[cmdGroupName][cmdName].apply(that.handle, params);
+						} else {
+							that.handle[cmdGroupName].apply(that.handle, params);
+						}
+					});
 
-					if (cmdName) {
-						that.handle[cmdGroupName][cmdName].apply(that.handle, params);
-					} else {
-						that.handle[cmdGroupName].apply(that.handle, params);
-					}
-				});
+					async.series(tasks, function (err) {
+						cb(err, channel, method, data);
 
-				async.series(tasks, function (err) {
-					cb(err, channel, method, data);
-
-					if (that.cmdQueue.length === 0) {
-						// log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" cmdQueue.length === 0');
-						that.cmdInProgress = false;
-					} else {
-						// log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" readFromQueue() rerunning');
-						readFromQueue();
-					}
-				});
-			}
-			readFromQueue();
-		};
-		cb();
-	});
-
-	// Set QoS to 10
-	tasks.push(function (cb) {
-		const	prefetchSize	= 0,
-			prefetchCount	= 10,
-			global	= true;
-
-		that.handle.cmd('basic.qos', [that.channelName, prefetchSize, prefetchCount, global], function (err) {
-			that.log.verbose(logPrefix + 'basic.qos set to: "' + prefetchCount + '"');
-			cb(err);
+						if (that.cmdQueue.length === 0) {
+							// log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" cmdQueue.length === 0');
+							that.cmdInProgress = false;
+						} else {
+							// log.silly(topLogPrefix + 'handle.cmd() - readFromQueue() - cmdStr: "' + cmdStr + '" readFromQueue() rerunning');
+							readFromQueue();
+						}
+					});
+				}
+				readFromQueue();
+			};
+			cb();
 		});
-	});
 
-	async.series(tasks, function (err) {
-		if ( ! err) {
-			if (that.loopback === true) {
-				that.log.verbose(logPrefix + 'Initialized on loopback interface');
-			} else {
-				that.log.verbose(logPrefix + 'Initialized on ' + that.host + ':' + that.port);
-			}
-			that.queueReady	= true;
-			setImmediate(function () {
-				that.emit('ready');
+		// Set QoS to 10
+		tasks.push(function (cb) {
+			const	prefetchSize	= 0,
+				prefetchCount	= 10,
+				global	= true;
+
+			that.handle.cmd('basic.qos', [that.channelName, prefetchSize, prefetchCount, global], function (err) {
+				that.log.verbose(logPrefix + 'basic.qos set to: "' + prefetchCount + '"');
+				cb(err);
 			});
-		}
-	});
+		});
+
+		async.series(tasks, function (err) {
+			if ( ! err) {
+				if (that.loopback === true) {
+					that.log.verbose(logPrefix + 'Initialized on loopback interface');
+				} else {
+					that.log.verbose(logPrefix + 'Initialized on ' + that.host + ':' + that.port);
+				}
+				that.queueReady	= true;
+				setImmediate(function () {
+					that.emit('ready');
+				});
+			}
+		});
+	};
 }
 
 // Make Intercom an event emitter
