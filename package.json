@@ -24,7 +24,7 @@
   },
   "homepage": "https://github.com/larvit/larvitamintercom#readme",
   "dependencies": {
-    "async": "^2.0.1",
+    "async": "^3.0.0",
     "bramqp": "^0.6.0",
     "larvitutils": "^2.0.0",
     "lodash": "^4.17.4",
