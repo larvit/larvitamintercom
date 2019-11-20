@@ -26,7 +26,7 @@
   "dependencies": {
     "async": "^2.0.1",
     "bramqp": "^0.6.0",
-    "larvitutils": "^2.0.0",
+    "larvitutils": "^4.0.0",
     "lodash": "^4.17.4",
     "uuid": "^3.0.0"
   },
