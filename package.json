@@ -35,7 +35,7 @@
     "eslint-config-google": "0.14.0",
     "eslint-plugin-html": "5.0.5",
     "eslint-plugin-import": "2.20.1",
-    "mocha": "6.2.2",
+    "mocha": "8.3.2",
     "mocha-eslint": "5.0.0"
   }
 }
