@@ -4,12 +4,11 @@ const	EventEmitter	= require('events').EventEmitter,
 	topLogPrefix	= 'larvitamintercom: index.js: ',
 	uuidLib	= require('uuid'),
 	bramqp	= require('bramqp'),
-	LUtils	= require('larvitutils'),
-	lUtils	= new LUtils(),
+	{ Log, Utils }	= require('larvitutils'),
+	lUtils	= new Utils(),
 	async	= require('async'),
 	url	= require('url'),
-	net	= require('net'),
-	_	= require('lodash');
+	net	= require('net');
 
 /**
  * Intercom
@@ -36,7 +35,7 @@ function Intercom(options) {
 	}
 
 	if ( ! options.log) {
-		options.log	= new lUtils.Log();
+		options.log	= new Log();
 	}
 
 	parsedConStr	= url.parse(options.conStr);
@@ -850,7 +849,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 			&& that.loopbackConQueue[options.exchange]	!== 'connected'
 			&& options.ignoreConQueue	!== true
 		) {
-			const	newOrgMsg	= _.cloneDeep(orgMsg);
+			const	newOrgMsg	= JSON.parse(JSON.stringify(orgMsg));
 
 			if (that.loopbackConQueue[options.exchange] === undefined) {
 				that.loopbackConQueue[options.exchange]	= [];

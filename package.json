@@ -1,10 +1,12 @@
 {
   "name": "larvitamintercom",
-  "version": "0.3.6",
+  "version": "0.4.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "mocha"
+    "lint": "eslint *.js test/*.js",
+    "test:unit": "mocha --exit --bail 'test/**/*.js'",
+    "test": "npm run lint && npm run test:unit"
   },
   "repository": {
     "type": "git",
@@ -24,18 +26,16 @@
   },
   "homepage": "https://github.com/larvit/larvitamintercom#readme",
   "dependencies": {
-    "async": "^2.0.1",
-    "bramqp": "^0.6.0",
-    "larvitutils": "^2.0.0",
-    "lodash": "^4.17.4",
-    "uuid": "^3.0.0"
+    "async": "^3.2.3",
+    "bramqp": "^0.6.1",
+    "larvitutils": "^5.0.0",
+    "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "eslint": "5.16.0",
+    "eslint": "8.9.0",
     "eslint-config-google": "0.14.0",
-    "eslint-plugin-html": "5.0.5",
-    "eslint-plugin-import": "2.20.1",
-    "mocha": "6.2.2",
-    "mocha-eslint": "5.0.0"
+    "eslint-plugin-html": "6.2.0",
+    "eslint-plugin-import": "2.25.4",
+    "mocha": "9.2.0"
   }
 }

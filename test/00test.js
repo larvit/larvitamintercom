@@ -3,10 +3,10 @@
 const	intercoms	= [],
 	Intercom	= require(__dirname + '/../index.js'),
 	assert	= require('assert'),
-	LUtils	= require('larvitutils'),
-	lUtils	= new LUtils(),
+	{ Log, Utils }	= require('larvitutils'),
+	lUtils	= new Utils(),
 	async	= require('async'),
-	log	= new lUtils.Log(),
+	log	= new Log(),
 	fs	= require('fs');
 
 before(function (done) {
