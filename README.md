@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/larvit/larvitamintercom.svg?branch=master)](https://travis-ci.org/larvit/larvitamintercom) [![Dependencies](https://david-dm.org/larvit/larvitamintercom.svg)](https://david-dm.org/larvit/larvitamintercom.svg)
+[![Build Status](https://github.com/larvit/larvitamintercom/actions/workflows/actions.yml/badge.svg)](https://github.com/larvit/larvitamintercom/actions)
 
 # Larvitamintercom
 
