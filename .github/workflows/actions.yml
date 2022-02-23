@@ -13,11 +13,11 @@ jobs:
     steps:
     - uses: getong/rabbitmq-action@v1.2
       with:
-        rabbitmq version: '3.8.2-management-alpine'
-        host port: 5672
+        rabbitmq version: '3-management'
+        host port: 15672
         rabbitmq user: 'user'
         rabbitmq password: 'test'
-        rabbitmq vhost: 'vhost_name'
+        rabbitmq vhost: '/'
 
     - uses: actions/checkout@v2
     - name: Use Node.js ${{ matrix.node-version }}
@@ -26,5 +26,5 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
-    - run: echo '"amqp://user:test@127.0.0.1:5672"' > ./config/amqp_test.json
+    - run: echo '"amqp://user:test@127.0.0.1:15672"' > ./config/amqp_test.json
     - run: npm test
