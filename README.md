@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/larvit/larvitamintercom/actions/workflows/actions.yml/badge.svg)](https://github.com/larvit/larvitamintercom/actions)
+[![Build Status](https://github.com/larvit/larvitamintercom/actions/workflows/ci.yml/badge.svg)](https://github.com/larvit/larvitamintercom/actions)
 
 # Larvitamintercom
 
