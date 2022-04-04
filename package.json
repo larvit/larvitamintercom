@@ -26,10 +26,10 @@
   },
   "homepage": "https://github.com/larvit/larvitamintercom#readme",
   "dependencies": {
-    "async": "^3.2.3",
-    "bramqp": "^0.6.1",
-    "larvitutils": "^5.0.0",
-    "uuid": "^8.3.2"
+    "async": "3.2.3",
+    "bramqp": "0.6.1",
+    "larvitutils": "5.0.0",
+    "uuid": "8.3.2"
   },
   "devDependencies": {
     "eslint": "8.12.0",
