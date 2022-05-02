@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -32,7 +32,7 @@
     "uuid": "8.3.2"
   },
   "devDependencies": {
-    "eslint": "8.13.0",
+    "eslint": "8.14.0",
     "eslint-config-google": "0.14.0",
     "eslint-plugin-html": "6.2.0",
     "eslint-plugin-import": "2.26.0",
