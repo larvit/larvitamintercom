@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "0.4.35",
+  "version": "0.4.36",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -28,7 +28,7 @@
   "dependencies": {
     "async": "3.2.4",
     "bramqp": "0.6.1",
-    "larvitutils": "5.1.26",
+    "larvitutils": "5.1.28",
     "uuid": "9.0.0"
   },
   "devDependencies": {
