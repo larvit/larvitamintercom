@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "0.4.75",
+  "version": "0.4.76",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -28,13 +28,13 @@
   "dependencies": {
     "async": "3.2.5",
     "bramqp": "0.6.1",
-    "larvitutils": "5.1.108",
+    "larvitutils": "5.1.109",
     "uuid": "10.0.0"
   },
   "devDependencies": {
-    "eslint": "8.57.0",
+    "eslint": "8.57.1",
     "eslint-config-google": "0.14.0",
-    "eslint-plugin-html": "8.1.1",
+    "eslint-plugin-html": "8.1.2",
     "eslint-plugin-import": "2.30.0",
     "mocha": "10.7.3"
   }
