@@ -805,7 +805,7 @@ Intercom.prototype.ready = function (cb) {
  */
 Intercom.prototype.send = function (orgMsg, options, cb) {
 	const	logPrefix	= topLogPrefix + 'Intercom.prototype.send() - ',
-		message	= require('util')._extend({}, orgMsg),
+		message	= Object.assign({}, orgMsg),
 		that	= this,
 		tasks	= [];
 
