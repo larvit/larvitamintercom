@@ -121,3 +121,13 @@ const	Intercom	= require('larvitamintercom').Intercom,
 	conStr	= 'amqp://user:password@192.168.0.1/',
 	intercom	= new Intercom({'conStr': conStr, 'log': log});
 ```
+
+### Connect to a cluster
+
+The `conString` can also be an array.
+
+```javascript
+const	Intercom	= require('larvitamintercom'),
+	conStr	= ['amqp://user:password@192.168.0.1/', 'amqp://user:password@192.168.0.2/'],
+	intercom	= new Intercom(conStr);
+```
