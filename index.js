@@ -8,8 +8,6 @@ const	EventEmitter	= require('events').EventEmitter,
 	lUtils	= new Utils(),
 	async	= require('async');
 
-let channel;
-
 /**
  * Intercom
  *
@@ -80,7 +78,7 @@ function Intercom(options) {
 			that.handle.channel = that.handle.createChannel({
 				'json': true,
 				'setup': newChannel => {
-					channel = newChannel;
+					that.channel = newChannel;
 				}
 			});
 
@@ -119,10 +117,12 @@ Intercom.prototype.initializeListeners = function () {
 
 	// Set QoS to 10
 	tasks.push(function (cb) {
+		if (that.loopback === true) return cb();
+
 		const	prefetchCount	= 10,
 			global	= true;
 
-		channel.prefetch(prefetchCount, global).then(() => {
+		that.channel.prefetch(prefetchCount, global).then(() => {
 			that.log.verbose(logPrefix + 'basic.qos set to: "' + prefetchCount + '"');
 
 			cb();
