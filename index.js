@@ -55,9 +55,9 @@ function Intercom(options) {
 		that.loopback	= true;
 		that.loopbackConQueue	= {};
 		that.handle	= new EventEmitter;
-		that.handle.channel = {};
-		that.handle.channel.ack = () => {};
-		that.handle.channel.nack = () => {};
+		that.channelWrapper = {};
+		that.channelWrapper.ack = () => {};
+		that.channelWrapper.nack = () => {};
 
 		that.log.verbose(logPrefix + 'Initializing on loopback interface');
 
@@ -72,39 +72,40 @@ function Intercom(options) {
 
 		that.handle = amqp.connect(that.servers);
 
-		that.handle.on('connect', function (options) {
-			that.log.info(logPrefix + 'AMQP connected to "' + options.url + '"');
-
-			that.handle.channel = that.handle.createChannel({
-				'json': true,
-				'setup': newChannel => {
-					that.channel = newChannel;
-				}
-			});
-
-			that.handle.channel.on('connect', function () {
-				that.log.verbose(logPrefix + 'Channel connected.');
+		that.channelWrapper = that.handle.createChannel({
+			'json': true,
+			'setup': channel => {
+				that.log.verbose(logPrefix + 'Channel setup (new or reconnected)');
+				that.channel = channel;
 				that.initializeListeners();
-			});
-
-			that.handle.channel.on('error', function (err) {
-				that.log.error(logPrefix + 'Channel error: "' + err + '"');
-			});
+			},
 		});
 
-		that.handle.on('connectFailed', function (options) {
+		that.channelWrapper.on('connect', () => {
+			that.log.verbose(logPrefix + 'ChannelWrapper connected.');
+		});
+
+		that.channelWrapper.on('error', (err) => {
+			that.log.error(logPrefix + 'ChannelWrapper error:', err);
+		});
+
+		that.handle.on('connect', (options) => {
+			that.log.info(logPrefix + 'AMQP connected to "' + options.url + '"');
+		});
+
+		that.handle.on('connectFailed', (options) => {
 			that.log.error(logPrefix + 'AMQP failed to connect to "' + options.url + '" with error: "' + options.err + '"');
 		});
 
-		that.handle.on('disconnect', function (options) {
+		that.handle.on('disconnect', (options) => {
 			that.log.error(logPrefix + 'AMQP disconnected with error: "' + options.err + '"');
 		});
 
-		that.handle.on('blocked', function (options) {
+		that.handle.on('blocked', (options) => {
 			that.log.warn(logPrefix + 'AMQP connection is blocked with reason: "' + options.reason + '"');
 		});
 
-		that.handle.on('unblocked', function () {
+		that.handle.on('unblocked', () => {
 			that.log.info(logPrefix + 'AMQP is unblocked.');
 		});
 	}
@@ -163,7 +164,7 @@ Intercom.prototype.bindQueue = function (queueName, exchange, cb) {
 	that.ready(function (err) {
 		if (err) return cb(err);
 
-		that.handle.channel.bindQueue(queueName, exchange, '', args).then(() => {
+		that.channelWrapper.bindQueue(queueName, exchange, '', args).then(() => {
 			that.boundQueues[queueName + '___' + exchange]	= true;
 			// log.silly(logPrefix + 'Bound queue "' + queueName + '" to exchange "' + exchange + '"');
 
@@ -267,7 +268,7 @@ Intercom.prototype.declareExchange = function (exchangeName, cb) {
 
 		that.log.debug(logPrefix + 'Declaring');
 
-		that.handle.channel.assertExchange(exchangeName, exchangeType, { durable, internal, autoDelete }).then(() => {
+		that.channelWrapper.assertExchange(exchangeName, exchangeType, { durable, internal, autoDelete }).then(() => {
 			that.declaredExchanges.push(exchangeName);
 			cb();
 		}).catch(err => {
@@ -325,7 +326,7 @@ Intercom.prototype.declareQueue = function (options, cb) {
 	that.ready(function (err) {
 		if (err) return cb(err);
 
-		that.handle.channel.assertQueue(options.queueName, { durable, autoDelete }).then(data => {
+		that.channelWrapper.assertQueue(options.queueName, { durable, autoDelete }).then(data => {
 			if (options.queueName !== '') {
 				that.declaredQueues[queueKey]	= true;
 			}
@@ -350,7 +351,7 @@ Intercom.prototype.declareQueue = function (options, cb) {
 // 		cb = function () {};
 // 	}
 
-// 	that.handle.channel.deleteQueue(queueName, { ifUnused, ifEmpty }, function (err, data) {
+// 	that.channelWrapper.deleteQueue(queueName, { ifUnused, ifEmpty }, function (err, data) {
 // 		if (err) {
 // 			that.log.error(logPrefix + 'Could not delete queue, err: ' + err.message);
 
@@ -431,7 +432,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 				if (err) {
 					that.log.warn(logPrefix + 'nack, err: ' + err.message);
 
-					that.handle.channel.nack(message);
+					that.channelWrapper.nack(message);
 				} else {
 					const msg = Object.assign(message, {
 						'fields': {
@@ -441,7 +442,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 
 					// log.silly(logPrefix + 'ack');
 
-					that.handle.channel.ack(msg);
+					that.channelWrapper.ack(msg);
 
 				}
 			}, deliveryTag);
@@ -465,7 +466,7 @@ Intercom.prototype.genericConsume = function (options, msgCb, cb) {
 		// No need to send a command on the queue for the loopback, handle this directly in the send function
 		if (that.loopback === true) return cb();
 
-		that.handle.channel.consume(queueName, function (message) {
+		that.channelWrapper.consume(queueName, function (message) {
 			let content;
 
 			try {
@@ -610,7 +611,7 @@ Intercom.prototype.send = function (orgMsg, options, cb) {
 		const	mandatory	= true,
 			immediate	= false;
 
-		that.handle.channel.publish(options.exchange, 'ignored-routing-key', message, { mandatory, immediate }).then(() => {
+		that.channelWrapper.publish(options.exchange, 'ignored-routing-key', message, { mandatory, immediate }).then(() => {
 			// log.silly(logPrefix + 'Published (no content sent) to exchange: "' + options.exchange + '", uuid: "' + message.uuid + '", message: "' + stringifiedMsg + '"');
 
 			cbsRan ++;
@@ -655,6 +656,14 @@ Intercom.prototype.subscribe = function (options, msgCb, cb) {
 	that.log.verbose(logPrefix + 'Starting on exchange "' + options.exchange + '"');
 
 	this.genericConsume(options, msgCb, cb);
+};
+
+Intercom.prototype.close = function () {
+	const that = this;
+
+	if (that.handle) {
+		that.handle.close(); // closes channels too
+	}
 };
 
 exports = module.exports = Intercom;

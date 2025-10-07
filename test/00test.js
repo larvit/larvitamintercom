@@ -6,6 +6,7 @@ const	intercoms	= [],
 	{ Log, Utils }	= require('larvitutils'),
 	lUtils	= new Utils(),
 	async	= require('async'),
+	uuidLib = require('uuid'),
 	log	= new Log(),
 	fs	= require('fs');
 
@@ -55,8 +56,7 @@ describe('Send and receive', function () {
 		it('check so the first intercom is up', function (done) {
 			const	intercom	= intercoms[0];
 
-			assert.notDeepEqual(intercom.handle,	undefined);
-			assert.notDeepEqual(intercom.handle.channel,	undefined);
+			assert.notDeepEqual(intercom.channelWrapper,	undefined);
 			done();
 		});
 
@@ -199,7 +199,7 @@ describe('Send and receive', function () {
 		});
 
 		// ack test
-		/*it('should get a message resend if closing a connection and opening up again without acking a received message', function (done) {
+		it('should get a message resend if closing a connection and opening up again without acking a received message', function (done) {
 			const	sendIntercom	= intercoms[12],
 				consumeIntercom1	= intercoms[13],
 				consumeIntercom2	= intercoms[14],
@@ -238,7 +238,6 @@ describe('Send and receive', function () {
 						if (msg.foo !== uuid) {
 							throw new Error('Invalid message received');
 						}
-						done();
 					}, cb);
 				}, 5000);
 			});
@@ -247,11 +246,11 @@ describe('Send and receive', function () {
 				if (err) throw err;
 				done();
 			});
-		});*/
+		});
 
 		// Squelch test - limit amount of sent messages before receiving ack:s
 		it('should wait to send more messages when squelching is on', function (done) {
-			const	exchangeName	= 'test_squelcing',
+			const	exchangeName	= 'test_squelcing' + uuidLib.v4().toString(),
 				sendIntercom	= intercoms[15],
 				consIntercom	= intercoms[16],
 				acks	= [],
