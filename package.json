@@ -1,6 +1,6 @@
 {
   "name": "larvitamintercom",
-  "version": "1.1.23",
+  "version": "1.1.24",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -27,9 +27,9 @@
   "homepage": "https://github.com/larvit/larvitamintercom#readme",
   "dependencies": {
     "amqp-connection-manager": "5.0.0",
-    "amqplib": "2.1.0",
+    "amqplib": "2.2.0",
     "async": "3.2.6",
-    "larvitutils": "5.1.209",
+    "larvitutils": "5.1.212",
     "uuid": "11.1.0"
   },
   "devDependencies": {
